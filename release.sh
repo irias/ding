@@ -1,6 +1,7 @@
 #!/bin/sh
 mkdir local assets 2>/dev/null
 
+python www-src/build.py &&
 sherpadoc Ding >assets/ding.json &&
 env GOOS=linux GOARCH=amd64 \
 NAME=$(basename $PWD) \

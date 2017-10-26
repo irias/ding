@@ -1,11 +1,10 @@
-run:
+run: build0
+	./ding local/config.json
+
+build0:
 	python www-src/build.py
 	go build -i
 	sherpadoc Ding >assets/ding.json
-	./ding local/config.json
-
-build:
-	go build -i
 
 frontend:
 	python www-src/build.py
