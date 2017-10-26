@@ -39,16 +39,18 @@ func (Ding) Status() {
 
 // Build a specific commit in the background, returning immediately.
 func (Ding) BuildStart(repoName, branch, commit string) {
-	defer func() {
-		if err := recover(); err != nil {
-			if serr, ok := err.(*sherpa.Error); ok {
-				if serr.Code != "userError" {
-					log.Println("background build failed:", serr.Message)
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				if serr, ok := err.(*sherpa.Error); ok {
+					if serr.Code != "userError" {
+						log.Println("background build failed:", serr.Message)
+					}
 				}
 			}
-		}
+		}()
+		Ding{}.Build(repoName, branch, commit)
 	}()
-	go Ding{}.Build(repoName, branch, commit)
 }
 
 // Build a specific commit.
