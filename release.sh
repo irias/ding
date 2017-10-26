@@ -2,7 +2,7 @@
 mkdir local assets 2>/dev/null
 
 sherpadoc Ding >assets/ding.json &&
-exec env GOOS=linux GOARCH=amd64 \
+env GOOS=linux GOARCH=amd64 \
 NAME=$(basename $PWD) \
 VERSION=$(git describe --tags | sed 's/^v//') \
 GOVERSION=$(go version | cut -f3 -d' ') \
@@ -14,8 +14,7 @@ sh -c '
 	mv ${NAME} $DEST &&
 	sh -c "cat assets.zip >>$DEST" &&
 	echo release: ding $VERSION $GOOS $GOARCH $GOVERSION $DEST
-'
-
+' &&
 exec env GOOS=linux GOARCH=amd64 \
 NAME=dingkick \
 VERSION=$(git describe --tags | sed 's/^v//') \
