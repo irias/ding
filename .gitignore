@@ -1,0 +1,13 @@
+/.sass-cache/
+/local/
+/assets/
+/assets.zip
+/ding
+/node_modules/
+
+/config/
+/build/
+/release/
+
+*.swp
+*.pyc

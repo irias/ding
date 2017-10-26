@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Ding</title>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" type="text/css" href="static/css/app-vendor.css?v=REV" />
+		<link rel="stylesheet" type="text/css" href="static/css/app.css?v=REV" />
+
+		<script src="static/js/app-vendor.js?v=REV"></script>
+		<script src="static/js/app-templates.js?v=REV"></script>
+		<script src="/ding/sherpa.js"></script>
+		<script>var api = ding;</script>
+		<script src="static/js/app.js?v=REV"></script>
+	</head>
+	<body ng-app="app" class="body" ng-cloak>
+		<div class="loader" ng-show="loading">
+			<span class="loader-elem"><i class="fa fa-gear fa-spin"></i></span>
+		</div>
+		<div class="loadingsaved x-loadingsaved" style="display:none">
+			<i class="fa fa-check"></i> Opgeslagen ☺</i>
+		</div>
+		<div class="topbar" role="navigation">
+			<a href="#/"class="logo">
+				<img src="static/img/logo.png?v=REV" class="logo-img" />
+			</a>
+			<div ng-if="breadcrumbs" class="breadcrumbs">
+				<span class="crumb">
+					<a ng-href="#/" icon="home"></a>
+				</span>
+				<span class="crumb" ng-repeat="bc in breadcrumbs" ng-class="{active: $last}">
+					<a ng-if="!$last" ng-href="#{{bc.path}}" ng-bind="bc.label" class="margin-right-xs"></a>
+					<span ng-if="$last" ng-bind="bc.label"></span>
+				</span>
+			</div>
+			<div class="topright-buttons">
+			</div>
+			<div style="clear:both"></div>
+		</div>
+
+		<div class="page">
+			<div class="container-fluid">
+				<ng-view autoscroll="true">
+				</ng-view>
+			</div>
+		</div>
+		<footer class="footer">
+			<div class="container-fluid">
+				<div class="row">
+					<div class="col-xs-6">
+						<span>{{ _app_version }}</span>
+					</div>
+					<div class="col-xs-6">
+						<div class="text-right">
+							Ontwikkeld door <a href="https://www.irias.nl/" style="color:inherit"><img src="static/img/irias-logo.png?v=REV" style="height:30px" /></a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</footer>
+	</body>
+</html>

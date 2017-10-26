@@ -1,0 +1,76 @@
+html {
+	overflow-y: scroll;
+}
+html {
+	height: 100%;
+}
+
+body {
+	position: relative;
+	min-height: 100%;
+}
+
+// prevent jumping to top of page when modal opens
+body.modal-open {
+	overflow: visible;
+}
+
+.block404 {
+	text-align: center;
+	margin: 4em 0;
+	.big {
+		font-size: 72px;
+	}
+	.small {
+		font-size: 32px;
+	}
+}
+
+.page {
+	padding: 10px 0;
+}
+
+.page-header {
+	margin-top: 0;
+	margin-bottom: 10px;
+}
+
+.page-buttons {
+	margin-bottom: 4ex;
+}
+
+// set on a td with colspan when there are no results for a table
+.empty-table {
+	padding: 2em !important;
+	background-color: #f8f8f8;
+}
+
+.table-action {
+	max-width: 35%;
+	float: right;
+	clear: both;
+	margin-top: -5px; // compensate for padding on heading
+	input {
+		max-width: 100%;
+		width: 20em;
+	}
+}
+
+.panel-title-button {
+	margin-top: -6px; // compensate for padding on heading
+}
+
+// for entire rows that are clickable, in a table listing objects
+.clickrow {
+	cursor: pointer;
+}
+
+// override bootstrap style. default tooltip font is too small.
+.tooltip {
+	font-size: inherit;
+}
+
+.modal-logo {
+	height: 30px;
+	float: right;
+}

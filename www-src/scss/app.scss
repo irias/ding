@@ -1,0 +1,12 @@
+$brand-color: #002857; // irias blue
+
+$color-danger: #d9534f; // or #a94442
+$color-success: #3c763d; // or #5cb85c with border #4cae4c
+
+@import "callout";
+@import "nav";
+@import "common";
+@import "footer";
+@import "sortcol";
+@import "imagebackdrop";
+@import "loader";

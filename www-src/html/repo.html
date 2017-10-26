@@ -1,0 +1,97 @@
+<div class="row">
+	<div class="col-xs-12">
+		<div class="page-buttons">
+			<button btn="danger" icon="trash" loading-click="removeRepo()">Remove repo</button>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+		<form saving-submit="save()">
+			<div class="panel panel-default">
+				<div class="panel-heading">
+					<div class="panel-title">Repository</div>
+				</div>
+				<div class="panel-body">
+					<div class="form-group">
+						<label>Name</label>
+						<input type="text" ng-model="repo.name" class="form-control" required placeholder="Name..." disabled />
+					</div>
+
+					<div class="form-group">
+						<label>Origin</label>
+						<input type="text" ng-model="repo.origin" class="form-control" required placeholder="git.example.com:repo.git" />
+					</div>
+
+					<div class="bs-callout bs-callout-info">
+						The scripts below are run in a relatively clean environment. The following environment variables are set:
+						<ul>
+							<li>$HOME, an empty directory</li>
+							<li>$BUILDID, the build number, should be used in the resulting file names</li>
+						</ul>
+						The scripts are run in the checkout directory. They should exit with status 0 only when successful.
+					</div>
+
+					<div class="form-group">
+						<label>build.sh</label>
+						<textarea class="form-control" ng-model="repo_config.build_script" rows="10" placeholder="shell script for to compile"></textarea>
+					</div>
+
+					<div class="form-group">
+						<label>test.sh</label>
+						<textarea class="form-control" ng-model="repo_config.test_script" rows="10" placeholder="shell script for to run tests"></textarea>
+					</div>
+
+					<div class="form-group">
+						<label>release.sh</label>
+						<textarea class="form-control" ng-model="repo_config.release_script" rows="10" placeholder="shell script for to create releaseable files"></textarea>
+						<div class="bs-callout bs-callout-info">
+							The standard output of the release script is parsed. Lines that match this format are treated as released files: <tt>"release:" command version os arch toolchain path</tt>. Where "release:" is just the literal string <tt>release</tt>. Command is the name of the command, as you would type it in a terminal. Version is a semver version, x.y.z. Os must be one of: any, linux, darwin, openbsd, windows; the OS this program can run on, any is for platform-independent tools like a jar. Arch must be one of: any, amd64, arm64; similar to OS. Toolchain should describe the compiler and possibly other tools that are used to build this release. Path is the local path (either absolute or relative to the checkout directory) of the released file.
+						</div>
+					</div>
+				</div>
+				<div class="panel-footer">
+					<button type="submit" class="btn btn-primary" icon="save">Save</button>
+				</div>
+			</div>
+		</form>
+	</div>
+
+	<div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<div class="panel-title">Builds</div>
+			</div>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<td>Status</td>
+						<td>Branch</td>
+						<td>Results</td>
+						<td>When</td>
+						<td>Action</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr ng-if="builds.length === 0">
+						<td colspan="5">No builds</td>
+					</tr>
+					<tr ng-repeat="build in builds">
+						<td><build-status status="build.status"></build-status></td>
+						<td>{{ build.branch }}</td>
+						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
+						<td><age time="build.start"></age></td>
+						<td>
+							<div class="btn-group">
+								<a ng-href="#/repo/{{ repo.name }}/build/{{ build.id }}/" btn="default sm">Open</a>
+								<button btn="danger sm" icon="trash" loading-click="removeBuild(build)">Delete</a>
+								<button btn="default sm" icon="cog" saving-click="retryBuild(build)">Retry build</a>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>

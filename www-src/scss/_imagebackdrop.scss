@@ -1,0 +1,25 @@
+// convert -resize 1920x -quality 50 abigail-lynn-316133.jpg unsplash-abigail-lynn-316133-1920x.jpg
+// convert -resize 1280x -quality 60 abigail-lynn-316133.jpg unsplash-abigail-lynn-316133-1280x.jpg
+// convert -resize 780x -quality 65 abigail-lynn-316133.jpg unsplash-abigail-lynn-316133-780x.jpg
+
+.imagebackdrop {
+	opacity: 1.0 !important;
+	background-color: gray !important;
+	background-size: cover;
+	background-position: center center;
+}
+@media only screen and (max-width: 780px) {
+	.imagebackdrop {
+		background-image: url('../img/unsplash-abigail-lynn-316133-780x.jpg');
+	}
+}
+@media only screen and (min-width: 781px) and (max-width: 1280px) {
+	.imagebackdrop {
+		background-image: url('../img/unsplash-abigail-lynn-316133-1280x.jpg');
+	}
+}
+@media only screen and (min-width: 1281px) {
+	.imagebackdrop {
+		background-image: url('../img/unsplash-abigail-lynn-316133-1920x.jpg');
+	}
+}

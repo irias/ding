@@ -1,0 +1,12 @@
+<div class="modal-header">
+	<button type="button" class="close" ng-click="dismiss()"><span aria-hidden="true">&times;</span><span class="sr-only">Sluiten</span></button>
+	<h4 class="modal-title">Bevestigen</h4>
+</div>
+<div class="modal-body">
+	<div class="alert alert-danger">
+		{{message}}
+	</div>
+</div>
+<div class="modal-footer">
+	<button type="button" class="btn btn-default" saving-click="confirm()" icon="thumbs-up" autofocus>Bevestigen</button>
+</div>

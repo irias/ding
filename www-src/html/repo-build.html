@@ -1,0 +1,70 @@
+<div class="row">
+	<div class="col-xs-12">
+		<div class="page-buttons">
+			<button btn="danger" icon="trash" loading-click="removeBuild()">Remove build</button>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+		<h2>Build</h2>
+		<table class="table">
+			<tr>
+				<td>Status</td>
+				<td><build-status status="buildResult.build.status"></build-status></td>
+			</tr>
+			<tr>
+				<td>Branch</td>
+				<td>{{ buildResult.build.branch }}</td>
+			</tr>
+			<tr>
+				<td>Commit</td>
+				<td>{{ buildResult.build.commit_hash }}</td>
+			</tr>
+		</table>
+
+		<h2>Results</h2>
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Command</th>
+					<th>Version</th>
+					<th>Os</th>
+					<th>Arch</th>
+					<th>Toolchain</th>
+					<th>Link</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr ng-if="buildResult.build.results.length === 0">
+					<td>No results</td>
+				</tr>
+				<tr ng-repeat="result in buildResult.build.results">
+					<td>{{ result.command }}</td>
+					<td>{{ result.version }}</td>
+					<td>{{ result.os }}</td>
+					<td>{{ result.arch }}</td>
+					<td>{{ result.toolchain }}</td>
+					<td><a ng-href="/results/{{ repo.name }}/{{ result.filename }}">{{ result.filename }}</a></td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+
+	<div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+		<h2>Steps</h2>
+		<div ng-repeat="step in buildResult.steps">
+			<h3>{{ step.name }}<span ng-if="step.name !== 'success'"> (<timespent nsec="step.nsec"></timespent>)</span></h3>
+			<pre style="white-space: pre-wrap">{{ step.output }}</pre>
+		</div>
+
+		<h2>Config</h2>
+		<h3>build.sh</h3>
+		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.build_script }}</pre>
+		<h3>test.sh</h3>
+		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.test_script }}</pre>
+		<h3>release.sh</h3>
+		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.release_script }}</pre>
+	</div>
+</div>

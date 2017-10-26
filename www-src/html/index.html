@@ -1,0 +1,52 @@
+<div class="row">
+	<div class="col-xs-12">
+		<div class="page-buttons">
+			<div class="btn-group">
+				<button loading-click="newRepo()" btn="success" icon="plus-circle">New repository</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Repository</th>
+					<th>Branch</th>
+					<th>Status</th>
+					<th>When</th>
+					<th>Action</th>
+				</tr>
+			</thead>
+			<tbody ng-if="repoBuilds.length === 0">
+				<tr>
+					<td colspan="5">No repos</td>
+				</tr>
+			</tbody>
+			<tbody ng-repeat="repoBuild in repoBuilds | orderBy:youngestBuild">
+				<tr class="active">
+					<td colspan="5">
+						<a ng-href="#/repo/{{ repoBuild.repo.name }}/">{{ repoBuild.repo.name }}</a>
+					</td>
+				</tr>
+				<tr ng-if="repoBuild.builds.length === 0">
+					<td></td>
+					<td colspan="4">No builds</td>
+				</tr>
+				<tr ng-repeat="build in repoBuild.builds">
+					<td></td>
+					<td>{{ build.branch }}</td>
+					<td>
+						<span class="label" ng-class="{'label-success': build.status === 'success', 'label-danger': build.status !== 'success'}">{{ build.status }}</span>
+					</td>
+					<td><age time="build.start"></age></td>
+					<td>
+						<a class="btn btn-default" ng-href="#/repo/{{ repoBuild.repo.name }}/build/{{ build.id }}/">Open</a>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>

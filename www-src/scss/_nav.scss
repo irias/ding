@@ -1,0 +1,43 @@
+.topbar {
+	color: #f9f9f9;
+	background: $brand-color; // For browsers that do not support gradients
+        background: linear-gradient(to right, $brand-color, darken($brand-color, 5%)); // Standard syntax
+
+	a {
+		color: inherit;
+	}
+
+	.logo {
+		display: block;
+		float: left;
+		padding: 5px;
+		margin-right: 1em;
+		background-color: white;
+		.logo-img {
+			height: 30px; // matches btn-sm, and thus crumbs
+		}
+	}
+	.breadcrumbs {
+		float: left;
+		margin: 0;
+		list-style: none;
+		display: block;
+		padding: 5px;
+		line-height: 30px; // matches logo height!
+		> .crumb {
+			display: inline-block;
+			&:last-child {
+				font-weight: 500;
+			}
+		}
+		> .crumb + .crumb:before {
+			padding-left: 0.5em;
+			color: #ccc;
+			content: "/\00a0";
+		}
+	}
+	.topright-buttons {
+		float: right;
+		padding: 5px;
+	}
+}
