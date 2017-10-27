@@ -458,9 +458,9 @@ func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
 	})
 
 	buildDir := fmt.Sprintf("build/%s/%d/", repoName, buildId)
-	br.RepoConfig.BuildScript = readFile(buildDir + "scripts/build.sh")
-	br.RepoConfig.TestScript = readFile(buildDir + "scripts/test.sh")
-	br.RepoConfig.ReleaseScript = readFile(buildDir + "scripts/release.sh")
+	br.BuildConfig.BuildScript = readFile(buildDir + "scripts/build.sh")
+	br.BuildConfig.TestScript = readFile(buildDir + "scripts/test.sh")
+	br.BuildConfig.ReleaseScript = readFile(buildDir + "scripts/release.sh")
 
 	outputDir := buildDir + "output/"
 	for _, stepName := range stepNames {

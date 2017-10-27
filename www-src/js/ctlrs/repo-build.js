@@ -11,7 +11,9 @@ app.controller('RepoBuild', function($scope, $rootScope, $q, $location, Msg, Uti
 
 
 	$scope.repo = repo;
-	$scope.buildResult = buildResult;
+	$scope.build = buildResult.build;
+	$scope.build_config = buildResult.build_config;
+	$scope.steps = buildResult.steps;
 
 	$scope.removeBuild = function() {
 		return Msg.confirm('Are you sure?', function() {

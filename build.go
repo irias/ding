@@ -41,9 +41,9 @@ type Step struct {
 }
 
 type BuildResult struct {
-	Build      Build      `json:"build"`
-	RepoConfig RepoConfig `json:"repo_config"`
-	Steps      []Step     `json:"steps"`
+	Build       Build      `json:"build"`
+	BuildConfig RepoConfig `json:"build_config"`
+	Steps       []Step     `json:"steps"`
 }
 
 func fillLastLine(repoName string, b *Build) {

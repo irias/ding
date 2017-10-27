@@ -13,27 +13,27 @@
 			<tr>
 				<td>Status</td>
 				<td>
-					<build-status status="buildResult.build.status"></build-status>
-					<div ng-if="buildResult.build.finish && buildResult.build.status !== 'status'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ buildResult.build.last_line }}
-{{ buildResult.build.error_message }}</div>
+					<build-status status="build.status"></build-status>
+					<div ng-if="build.finish && build.status !== 'status'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
+{{ build.error_message }}</div>
 
 				</td>
 			</tr>
 			<tr>
 				<td>Build</td>
-				<td>{{ buildResult.build.id }}</td>
+				<td>{{ build.id }}</td>
 			</tr>
 			<tr>
 				<td>Branch</td>
-				<td>{{ buildResult.build.branch }}</td>
+				<td>{{ build.branch }}</td>
 			</tr>
 			<tr>
 				<td>Commit</td>
-				<td>{{ buildResult.build.commit_hash }}</td>
+				<td>{{ build.commit_hash }}</td>
 			</tr>
 			<tr>
 				<td>Build time</td>
-				<td><buildtime start="buildResult.build.start" finish="buildResult.build.finish"></buildtime></td>
+				<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
 			</tr>
 		</table>
 
@@ -51,10 +51,10 @@
 				</tr>
 			</thead>
 			<tbody>
-				<tr ng-if="buildResult.build.results.length === 0">
+				<tr ng-if="build.results.length === 0">
 					<td colspan="7">No results</td>
 				</tr>
-				<tr ng-repeat="result in buildResult.build.results">
+				<tr ng-repeat="result in build.results">
 					<td>{{ result.command }}</td>
 					<td>{{ result.version }}</td>
 					<td>{{ result.os }}</td>
@@ -69,17 +69,17 @@
 
 	<div class="col-xs-12 col-lg-6">
 		<h2>Steps</h2>
-		<div ng-repeat="step in buildResult.steps">
+		<div ng-repeat="step in steps">
 			<h3>{{ step.name }}<span ng-if="step.name !== 'success'"> (<timespent nsec="step.nsec"></timespent>)</span></h3>
 			<pre style="white-space: pre-wrap">{{ step.output }}</pre>
 		</div>
 
 		<h2>Config</h2>
 		<h3>build.sh</h3>
-		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.build_script }}</pre>
+		<pre style="white-space: pre-wrap">{{ build_config.build_script }}</pre>
 		<h3>test.sh</h3>
-		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.test_script }}</pre>
+		<pre style="white-space: pre-wrap">{{ build_config.test_script }}</pre>
 		<h3>release.sh</h3>
-		<pre style="white-space: pre-wrap">{{ buildResult.repo_config.release_script }}</pre>
+		<pre style="white-space: pre-wrap">{{ build_config.release_script }}</pre>
 	</div>
 </div>
