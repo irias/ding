@@ -64,7 +64,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		err = os.MkdirAll(outputDir, 0777)
 		sherpaCheck(err, "creating output dir")
 
-		build = _build(tx, build.Id)
+		build = _build(tx, repo.Name, build.Id)
 	})
 	return
 }
@@ -100,6 +100,15 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 	defer func() {
 		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
 		sherpaCheck(err, "marking build as success in database")
+
+		r := recover()
+		if r != nil {
+			if serr, ok := r.(*sherpa.Error); ok && serr.Code == "userError" {
+				err = database.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
+				sherpaCheck(err, "updating error message in database")
+			}
+			panic(r)
+		}
 	}()
 
 	_updateStatus := func(status string) {
@@ -154,7 +163,7 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
 		sherpaCheck(err, "marking build as success in database")
 
-		build = _build(tx, build.Id)
+		build = _build(tx, repo.Name, build.Id)
 	})
 	return build
 }
@@ -315,6 +324,12 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 		) repobuilds
 	`
 	checkParseRow(database.QueryRow(q), &rb, "fetching repobuilds")
+	for _, e := range rb {
+		for i, b := range e.Builds {
+			fillLastLine(e.Repo.Name, &b)
+			e.Builds[i] = b
+		}
+	}
 	return
 }
 
@@ -329,6 +344,10 @@ func (Ding) Repo(repoName string) (repo Repo) {
 func (Ding) Builds(repoName string) (builds []Build) {
 	q := `select coalesce(json_agg(bwr.* order by start desc), '[]') from build_with_result bwr join repo on bwr.repo_id = repo.id where repo.name=$1`
 	checkParseRow(database.QueryRow(q, repoName), &builds, "fetching builds")
+	for i, b := range builds {
+		fillLastLine(repoName, &b)
+		builds[i] = b
+	}
 	return
 }
 
@@ -435,7 +454,7 @@ func (Ding) RepoConfig(repoName string) (rc RepoConfig) {
 
 func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
 	transact(func(tx *sql.Tx) {
-		br.Build = _build(tx, buildId)
+		br.Build = _build(tx, repoName, buildId)
 	})
 
 	buildDir := fmt.Sprintf("build/%s/%d/", repoName, buildId)

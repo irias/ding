@@ -76,11 +76,13 @@
 						<td>Action</td>
 					</tr>
 				</thead>
-				<tbody>
-					<tr ng-if="builds.length === 0">
+				<tbody ng-if="builds.length === 0">
+					<tr>
 						<td colspan="8">No builds</td>
 					</tr>
-					<tr ng-repeat="build in builds">
+				</tbody>
+				<tbody ng-repeat="build in builds">
+					<tr>
 						<td><build-status status="build.status"></build-status></td>
 						<td>{{ build.branch }}</td>
 						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
@@ -94,6 +96,12 @@
 								<button btn="danger sm" icon="trash" loading-click="removeBuild(build)">Delete</a>
 								<button btn="default sm" icon="cog" saving-click="retryBuild(build)">Retry build</a>
 							</div>
+						</td>
+					</tr>
+					<tr ng-if="build.status !== 'success' && build.error_message">
+						<td colspan="8">
+							<div style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
+{{ build.error_message }}</div>
 						</td>
 					</tr>
 				</tbody>

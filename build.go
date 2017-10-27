@@ -3,6 +3,9 @@ package main
 import (
 	"database/sql"
 	"time"
+	"os"
+	"bufio"
+	"fmt"
 )
 
 type Result struct {
@@ -23,7 +26,10 @@ type Build struct {
 	Status     string     `json:"status"`
 	Start      time.Time  `json:"start"`
 	Finish     *time.Time `json:"finish"`
+	ErrorMessage string `json:"error_message"`
 	Results    []Result   `json:"results"`
+
+	LastLine string `json:"last_line"` // last line from last steps output
 }
 
 type Step struct {
@@ -40,8 +46,32 @@ type BuildResult struct {
 	Steps      []Step     `json:"steps"`
 }
 
-func _build(tx *sql.Tx, id int) (b Build) {
+func fillLastLine(repoName string, b *Build) {
+	if b.Finish == nil || b.Status == "success" {
+		return
+	}
+	path := fmt.Sprintf("build/%s/%d/output/%s.output", repoName, b.Id, b.Status)
+	f, err := os.Open(path)
+	if err != nil {
+		b.LastLine = fmt.Sprintf("(open for last line: %s)", err)
+		return
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		s := scanner.Text()
+		if s != "" {
+			b.LastLine = s
+		}
+	}
+	if err = scanner.Err(); err != nil {
+		b.LastLine = fmt.Sprintf("(reading for last line: %s)", err)
+	}
+}
+
+func _build(tx *sql.Tx, repoName string, id int) (b Build) {
 	q := `select row_to_json(bwr.*) from build_with_result bwr where id = $1`
 	checkParseRow(tx.QueryRow(q, id), &b, "fetching build")
+	fillLastLine(repoName, &b)
 	return
 }

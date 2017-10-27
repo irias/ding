@@ -12,7 +12,12 @@
 		<table class="table">
 			<tr>
 				<td>Status</td>
-				<td><build-status status="buildResult.build.status"></build-status></td>
+				<td>
+					<build-status status="buildResult.build.status"></build-status>
+					<div ng-if="buildResult.build.finish && buildResult.build.status !== 'status'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ buildResult.build.last_line }}
+{{ buildResult.build.error_message }}</div>
+
+				</td>
 			</tr>
 			<tr>
 				<td>Build</td>
