@@ -14,7 +14,7 @@ app
 			var sec = parseInt(new Date().getTime() - new Date(scope.time).getTime()) / 1000;
 			var age;
 			if (sec < 60) {
-				age = 'now';
+				age = Math.round(sec) + ' secs';
 			} else if (sec < 120*60) {
 				age = Math.round(sec / 60) + ' mins';
 			} else if (sec < 48*3600) {
