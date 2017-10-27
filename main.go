@@ -31,6 +31,7 @@ var (
 		ShowSherpaErrors      bool
 		PrintSherpaErrorStack bool
 		Database              string
+		Environment           map[string]string
 		Mail                  struct {
 			Enabled,
 			SmtpTls bool

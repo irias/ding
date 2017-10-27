@@ -94,25 +94,36 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 	err = os.MkdirAll(outputDir, 0777)
 	sherpaCheck(err, "creating output dir")
 
+	env := []string{
+		fmt.Sprintf("HOME=%s/home", buildDir),
+		fmt.Sprintf("BUILDID=%d", build.Id),
+		"REPONAME=" + repoName,
+		"BRANCH=" + branch,
+		"COMMITHASH=" + commit,
+	}
+	for key, value := range config.Environment {
+		env = append(env, key+"="+value)
+	}
+
 	_updateStatus("clone")
-	err = run(build.Id, "clone", buildDir, buildDir, "git", "clone", "--branch", branch, repo.Origin, "checkout/"+repo.Name)
+	err = run(env, "clone", buildDir, buildDir, "git", "clone", "--branch", branch, repo.Origin, "checkout/"+repo.Name)
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
 
 	_updateStatus("checkout")
-	err = run(build.Id, "checkout", buildDir, checkoutDir, "git", "checkout", commit)
+	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", commit)
 	sherpaUserCheck(err, "checkout out revision")
 
 	_updateStatus("build")
-	err = run(build.Id, "build", buildDir, checkoutDir, "../../scripts/build.sh")
+	err = run(env, "build", buildDir, checkoutDir, "../../scripts/build.sh")
 	sherpaUserCheck(err, "building")
 
 	_updateStatus("test")
-	err = run(build.Id, "test", buildDir, checkoutDir, "../../scripts/test.sh")
+	err = run(env, "test", buildDir, checkoutDir, "../../scripts/test.sh")
 	sherpaUserCheck(err, "running tests")
 
 	_updateStatus("release")
-	err = run(build.Id, "release", buildDir, checkoutDir, "../../scripts/release.sh")
+	err = run(env, "release", buildDir, checkoutDir, "../../scripts/release.sh")
 	sherpaUserCheck(err, "publishing build")
 
 	transact(func(tx *sql.Tx) {
@@ -203,13 +214,10 @@ func _copyScript(src, dst string) {
 	sherpaCheck(err, "copy script: chmod")
 }
 
-func run(buildId int, stage, buildDir, workDir, command string, args ...string) (err error) {
+func run(env []string, stage, buildDir, workDir, command string, args ...string) (err error) {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = workDir
-	cmd.Env = []string{
-		fmt.Sprintf("HOME=%s/home", buildDir),
-		fmt.Sprintf("BUILDID=%d", buildId),
-	}
+	cmd.Env = env
 	var output, stdout, stderr, nsecFile io.WriteCloser
 	t0 := time.Now()
 	defer func() {
