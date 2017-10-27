@@ -99,7 +99,7 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 func _doBuild(repo Repo, build Build, buildDir string) Build {
 	defer func() {
 		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
-		sherpaCheck(err, "marking build as success in database")
+		sherpaCheck(err, "marking build as finished in database")
 
 		r := recover()
 		if r != nil {
@@ -107,6 +107,62 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 				err = database.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
 				sherpaCheck(err, "updating error message in database")
 			}
+		}
+
+		var prevStatus string
+		err = database.QueryRow("select status from build join repo on build.repo_id = repo.id and repo.name = $1 and build.branch = $2 order by build.id desc offset 1 limit 1", repo.Name, build.Branch).Scan(&prevStatus)
+		if r != nil && (err != nil || prevStatus == "success") {
+			link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+
+			// for build.LastLine
+			transact(func(tx *sql.Tx) {
+				build = _build(tx, repo.Name, build.Id)
+			})
+			fillBuild(repo.Name, &build)
+
+			var errmsg string
+			if serr, ok := r.(*sherpa.Error); ok {
+				errmsg = serr.Message
+			} else {
+				errmsg = fmt.Sprintf("%v", r)
+			}
+			subject := fmt.Sprintf("ding: failure: repo %s branch %s failing", repo.Name, build.Branch)
+			textMsg := fmt.Sprintf(`Hi!
+
+Your build for branch %s on repo %s is now failing:
+
+	%s
+
+Last output:
+
+	%s
+	%s
+
+Please fix, thanks!
+
+Cheers,
+Ding
+`, build.Branch, repo.Name, link, build.LastLine, errmsg)
+			_sendmail(config.Notify.Name, config.Notify.Email, subject, textMsg)
+		}
+		if r == nil && err == nil && prevStatus != "success" {
+			link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+			subject := fmt.Sprintf("ding: resolved: repo %s branch %s is building again", repo.Name, build.Branch)
+			textMsg := fmt.Sprintf(`Hi!
+
+You fixed the build for branch %s on repo %s:
+
+	%s
+
+You're the bomb, keep it up!
+
+Cheers,
+Ding
+`, build.Branch, repo.Name, link)
+			_sendmail(config.Notify.Name, config.Notify.Email, subject, textMsg)
+		}
+
+		if r != nil {
 			panic(r)
 		}
 	}()
@@ -134,7 +190,7 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 
 	_updateStatus("checkout")
 	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", build.CommitHash)
-	sherpaUserCheck(err, "checkout out revision")
+	sherpaUserCheck(err, "checkout revision")
 
 	_updateStatus("build")
 	err = run(env, "build", buildDir, checkoutDir, "../../scripts/build.sh")

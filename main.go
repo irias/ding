@@ -32,7 +32,12 @@ var (
 		PrintSherpaErrorStack bool
 		Database              string
 		Environment           map[string]string
-		Mail                  struct {
+		Notify                struct {
+			Name  string
+			Email string
+		}
+		BaseURL string
+		Mail    struct {
 			Enabled,
 			SmtpTls bool
 			SmtpPort int
