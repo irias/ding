@@ -11,16 +11,17 @@ Dingkick can be used in a git hook to signal that a build should start.
 
 # Todo
 
-- send email on build failures
-
-- clone & checkout ook via een shell script?
+- implement button to "build latest version of branch"?
+- clone & checkout also through shell script?
 - add shell script to cleanup after a build. eg dropping a database.
 - timestamps in output lines?
 - test with more repositories
 - security: can (should) we run the builds as a separate user? how to make sure the build cannot touch files outside of its own directory?
-- how to clean up builds? we currently keep all the checkouts as is. should remove after certain time or certain number of builds per repo, so we don't clog the disk.  we should also save the build artefacts somewhere.
-- in case of failed build, show last line(s) of output?
+- how to clean up builds? we currently keep all the checkouts as is. should remove after certain time or certain number of builds per repo, so we don't clog the disk.  we should also be able to remove the build dirs while keeping the resulting binaries (and perhaps store the resulting binaries with gzip, can add up with these big go binaries).
 - button to restart a build with same scripts
+- make this work with github repos, perhaps bitbucket as well.  requires having a public face. that requires adding auth...
+- get live updates during builds using SSE or something similar
+- do some extra steps? like coverage checking, and displaying the results.
 
 # steps
 - clone
@@ -30,6 +31,7 @@ Dingkick can be used in a git hook to signal that a build should start.
 - release
 - success
 
+# files
 - config/<repo>/
 	build.sh
 	test.sh
