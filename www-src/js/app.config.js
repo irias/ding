@@ -36,8 +36,8 @@ app.config(function($routeProvider, $uibTooltipProvider) {
 		}
 	})
 	.when('/repo/:repoName/build/:buildId/', {
-		templateUrl: 'static/html/repo-build.html',
-		controller: 'RepoBuild',
+		templateUrl: 'static/html/build.html',
+		controller: 'Build',
 		resolve: {
 			repo: function($route) {
 				return api.repo($route.current.params.repoName);

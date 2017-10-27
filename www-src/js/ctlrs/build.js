@@ -3,7 +3,7 @@
 /* global app, api */
 'use strict';
 
-app.controller('RepoBuild', function($scope, $rootScope, $q, $location, Msg, Util, repo, buildResult) {
+app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, repo, buildResult) {
 	$rootScope.breadcrumbs = Util.crumbs([
 		Util.crumb('repo/' + repo.name, 'Repo ' + repo.name),
 		Util.crumb('build/' + buildResult.build.id + '/', 'Build ' + buildResult.build.id)
