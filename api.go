@@ -37,26 +37,7 @@ type Ding struct {
 func (Ding) Status() {
 }
 
-// Build a specific commit in the background, returning immediately.
-func (Ding) BuildStart(repoName, branch, commit string) {
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				if serr, ok := err.(*sherpa.Error); ok {
-					if serr.Code != "userError" {
-						log.Println("background build failed:", serr.Message)
-					}
-				}
-			}
-		}()
-		Ding{}.Build(repoName, branch, commit)
-	}()
-}
-
-// Build a specific commit.
-func (Ding) Build(repoName, branch, commit string) (build Build) {
-	var repo Repo
-	var buildDir string
+func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string) {
 	workdir, err := os.Getwd()
 	sherpaCheck(err, "getting current work dir")
 	transact(func(tx *sql.Tx) {
@@ -68,50 +49,82 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 		buildDir = fmt.Sprintf("%s/build/%s/%d", workdir, repo.Name, build.Id)
 		err := os.MkdirAll(buildDir, 0777)
 		sherpaCheck(err, "creating build dir")
-	})
 
+		err = os.MkdirAll(buildDir+"/scripts", 0777)
+		sherpaCheck(err, "creating scripts dir")
+		err = os.MkdirAll(buildDir+"/home", 0777)
+		sherpaCheck(err, "creating home dir")
+
+		scriptsDir := buildDir + "/scripts/"
+		for _, script := range []string{"build.sh", "test.sh", "release.sh"} {
+			_copyScript(fmt.Sprintf("config/%s/%s", repo.Name, script), scriptsDir+script)
+		}
+
+		outputDir := buildDir + "/output"
+		err = os.MkdirAll(outputDir, 0777)
+		sherpaCheck(err, "creating output dir")
+
+		build = _build(tx, build.Id)
+	})
+	return
+}
+
+// Build a specific commit in the background, returning immediately.
+func (Ding) BuildStart(repoName, branch, commit string) Build {
+	repo, build, buildDir := _prepareBuild(repoName, branch, commit)
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				if serr, ok := err.(*sherpa.Error); ok {
+					if serr.Code != "userError" {
+						log.Println("background build failed:", serr.Message)
+					}
+				}
+			}
+		}()
+		_doBuild(repo, build, buildDir)
+	}()
+	return build
+}
+
+// Build a specific commit.
+func (Ding) Build(repoName, branch, commit string) (build Build) {
+	var repo Repo
+	var buildDir string
+	repo, build, buildDir = _prepareBuild(repoName, branch, commit)
+	build = _doBuild(repo, build, buildDir)
+	return
+}
+
+func _doBuild(repo Repo, build Build, buildDir string) Build {
 	defer func() {
 		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
 		sherpaCheck(err, "marking build as success in database")
 	}()
-
-	err = os.MkdirAll(buildDir+"/scripts", 0777)
-	sherpaCheck(err, "creating scripts dir")
-	err = os.MkdirAll(buildDir+"/home", 0777)
-	sherpaCheck(err, "creating home dir")
-
-	scriptsDir := buildDir + "/scripts/"
-	for _, script := range []string{"build.sh", "test.sh", "release.sh"} {
-		_copyScript(fmt.Sprintf("config/%s/%s", repo.Name, script), scriptsDir+script)
-	}
 
 	_updateStatus := func(status string) {
 		_, err := database.Exec("update build set status=$1 where id=$2", status, build.Id)
 		sherpaCheck(err, "updating build status in database")
 	}
 
-	outputDir := buildDir + "/output"
-	err = os.MkdirAll(outputDir, 0777)
-	sherpaCheck(err, "creating output dir")
-
 	env := []string{
 		fmt.Sprintf("HOME=%s/home", buildDir),
 		fmt.Sprintf("BUILDID=%d", build.Id),
-		"REPONAME=" + repoName,
-		"BRANCH=" + branch,
-		"COMMITHASH=" + commit,
+		"REPONAME=" + repo.Name,
+		"BRANCH=" + build.Branch,
+		"COMMITHASH=" + build.CommitHash,
 	}
 	for key, value := range config.Environment {
-		env = append(env, key+"="+value)
+		env = append(env, key + "=" + value)
 	}
 
 	_updateStatus("clone")
-	err = run(env, "clone", buildDir, buildDir, "git", "clone", "--branch", branch, repo.Origin, "checkout/"+repo.Name)
+	err := run(env, "clone", buildDir, buildDir, "git", "clone", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
 
 	_updateStatus("checkout")
-	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", commit)
+	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", build.CommitHash)
 	sherpaUserCheck(err, "checkout out revision")
 
 	_updateStatus("build")
@@ -127,6 +140,7 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 	sherpaUserCheck(err, "publishing build")
 
 	transact(func(tx *sql.Tx) {
+		outputDir := buildDir + "/output"
 		results := parseResults(checkoutDir, outputDir+"/release.stdout")
 
 		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename, filesize) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
@@ -142,7 +156,7 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 
 		build = _build(tx, build.Id)
 	})
-	return
+	return build
 }
 
 func fileCopy(src, dst string) {

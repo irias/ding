@@ -42,6 +42,11 @@ func main() {
 	client, err := sherpa.NewClient(baseURL, []string{"build"})
 	check(err, "initializing sherpa client")
 
-	err = client.Call(nil, "buildStart", repoName, branch, commit)
+	var build struct {
+		Id int64
+	}
+	err = client.Call(&build, "buildStart", repoName, branch, commit)
 	check(err, "building")
+	_, err = fmt.Println("buildId", build.Id)
+	check(err, "write")
 }
