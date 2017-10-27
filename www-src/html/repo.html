@@ -72,13 +72,14 @@
 						<td>Version</td>
 						<td>Build</td>
 						<td>Spent</td>
+						<td>Disk</td>
 						<td>Age</td>
 						<td>Action</td>
 					</tr>
 				</thead>
 				<tbody ng-if="builds.length === 0">
 					<tr>
-						<td colspan="8">No builds</td>
+						<td colspan="9">No builds</td>
 					</tr>
 				</tbody>
 				<tbody ng-repeat="build in builds">
@@ -89,6 +90,7 @@
 						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>
 						<td>{{ build.id }}</td>
 						<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
+						<td><filesize size="build.disk_usage"></filesize></td>
 						<td><age time="build.start"></age></td>
 						<td>
 							<div class="btn-group">
@@ -99,7 +101,7 @@
 						</td>
 					</tr>
 					<tr ng-if="build.status !== 'success' && build.error_message">
-						<td colspan="8">
+						<td colspan="9">
 							<div style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
 {{ build.error_message }}</div>
 						</td>

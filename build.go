@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -29,7 +30,8 @@ type Build struct {
 	ErrorMessage string     `json:"error_message"`
 	Results      []Result   `json:"results"`
 
-	LastLine string `json:"last_line"` // last line from last steps output
+	LastLine  string `json:"last_line"`  // last line from last steps output
+	DiskUsage int64  `json:"disk_usage"` // disk usage for build
 }
 
 type Step struct {
@@ -46,7 +48,18 @@ type BuildResult struct {
 	Steps       []Step     `json:"steps"`
 }
 
-func fillLastLine(repoName string, b *Build) {
+func fillBuild(repoName string, b *Build) {
+	// add disk usage
+	b.DiskUsage = 0
+	buildDir := fmt.Sprintf("build/%s/%d", repoName, b.Id)
+	filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil {
+			const overhead = 2 * 1024
+			b.DiskUsage += overhead + info.Size()
+		}
+		return nil
+	})
+
 	if b.Finish == nil || b.Status == "success" {
 		return
 	}
@@ -72,6 +85,6 @@ func fillLastLine(repoName string, b *Build) {
 func _build(tx *sql.Tx, repoName string, id int) (b Build) {
 	q := `select row_to_json(bwr.*) from build_with_result bwr where id = $1`
 	checkParseRow(tx.QueryRow(q, id), &b, "fetching build")
-	fillLastLine(repoName, &b)
+	fillBuild(repoName, &b)
 	return
 }

@@ -50,7 +50,9 @@
 
 						</td>
 						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>
-						<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
+						<td>
+							<buildtime start="build.start" finish="build.finish"></buildtime> / <filesize size="build.disk_usage"></filesize>
+							</td>
 						<td><age time="build.start"></age></td>
 						<td>
 							<a class="btn btn-default" ng-href="#/repo/{{ repoBuild.repo.name }}/build/{{ build.id }}/">Open</a>

@@ -326,7 +326,7 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 	checkParseRow(database.QueryRow(q), &rb, "fetching repobuilds")
 	for _, e := range rb {
 		for i, b := range e.Builds {
-			fillLastLine(e.Repo.Name, &b)
+			fillBuild(e.Repo.Name, &b)
 			e.Builds[i] = b
 		}
 	}
@@ -345,7 +345,7 @@ func (Ding) Builds(repoName string) (builds []Build) {
 	q := `select coalesce(json_agg(bwr.* order by start desc), '[]') from build_with_result bwr join repo on bwr.repo_id = repo.id where repo.name=$1`
 	checkParseRow(database.QueryRow(q, repoName), &builds, "fetching builds")
 	for i, b := range builds {
-		fillLastLine(repoName, &b)
+		fillBuild(repoName, &b)
 		builds[i] = b
 	}
 	return
