@@ -1,11 +1,11 @@
 package main
 
 import (
-	"database/sql"
-	"time"
-	"os"
 	"bufio"
+	"database/sql"
 	"fmt"
+	"os"
+	"time"
 )
 
 type Result struct {
@@ -19,15 +19,15 @@ type Result struct {
 }
 
 type Build struct {
-	Id         int        `json:"id"`
-	RepoId     int        `json:"repo_id"`
-	Branch     string     `json:"branch"`
-	CommitHash string     `json:"commit_hash"`
-	Status     string     `json:"status"`
-	Start      time.Time  `json:"start"`
-	Finish     *time.Time `json:"finish"`
-	ErrorMessage string `json:"error_message"`
-	Results    []Result   `json:"results"`
+	Id           int        `json:"id"`
+	RepoId       int        `json:"repo_id"`
+	Branch       string     `json:"branch"`
+	CommitHash   string     `json:"commit_hash"`
+	Status       string     `json:"status"`
+	Start        time.Time  `json:"start"`
+	Finish       *time.Time `json:"finish"`
+	ErrorMessage string     `json:"error_message"`
+	Results      []Result   `json:"results"`
 
 	LastLine string `json:"last_line"` // last line from last steps output
 }

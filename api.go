@@ -124,7 +124,7 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 		"COMMITHASH=" + build.CommitHash,
 	}
 	for key, value := range config.Environment {
-		env = append(env, key + "=" + value)
+		env = append(env, key+"="+value)
 	}
 
 	_updateStatus("clone")
