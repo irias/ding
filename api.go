@@ -70,6 +70,11 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 		sherpaCheck(err, "creating build dir")
 	})
 
+	defer func() {
+		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
+		sherpaCheck(err, "marking build as success in database")
+	}()
+
 	err = os.MkdirAll(buildDir+"/scripts", 0777)
 	sherpaCheck(err, "creating scripts dir")
 	err = os.MkdirAll(buildDir+"/home", 0777)
