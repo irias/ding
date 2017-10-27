@@ -111,17 +111,12 @@ func (Ding) Build(repoName, branch, commit string) (build Build) {
 	sherpaUserCheck(err, "publishing build")
 
 	transact(func(tx *sql.Tx) {
-		results := parseResults(outputDir + "/release.stdout")
+		results := parseResults(checkoutDir, outputDir+"/release.stdout")
 
-		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename) values ($1, $2, $3, $4, $5, $6, $7) returning id`
+		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename, filesize) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 		for _, result := range results {
-			if !strings.HasPrefix(result.Filename, "/") {
-				result.Filename = checkoutDir + "/" + result.Filename
-			}
-			_, err := os.Stat(result.Filename)
-			sherpaUserCheck(err, "testing whether released file exists")
 			var id int
-			err = tx.QueryRow(qins, build.Id, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, path.Base(result.Filename)).Scan(&id)
+			err = tx.QueryRow(qins, build.Id, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, path.Base(result.Filename), result.Filesize).Scan(&id)
 			sherpaCheck(err, "inserting result into database")
 			fileCopy(result.Filename, fmt.Sprintf("release/%s/%s", repo.Name, path.Base(result.Filename)))
 		}
@@ -156,7 +151,7 @@ func fileCopy(src, dst string) {
 	sherpaCheck(err, "copying result file to destination")
 }
 
-func parseResults(path string) (results []Result) {
+func parseResults(checkoutDir, path string) (results []Result) {
 	f, err := os.Open(path)
 	sherpaUserCheck(err, "opening release output")
 	defer func() {
@@ -174,7 +169,14 @@ func parseResults(path string) (results []Result) {
 		if len(t) != 7 {
 			sherpaUserCheck(err, "invalid output line, should have 7 words: "+line)
 		}
-		results = append(results, Result{t[1], t[2], t[3], t[4], t[5], t[6]})
+		result := Result{t[1], t[2], t[3], t[4], t[5], t[6], 0}
+		if !strings.HasPrefix(result.Filename, "/") {
+			result.Filename = checkoutDir + "/" + result.Filename
+		}
+		info, err := os.Stat(result.Filename)
+		sherpaUserCheck(err, "testing whether released file exists")
+		result.Filesize = info.Size()
+		results = append(results, result)
 	}
 	err = scanner.Err()
 	sherpaUserCheck(err, "reading release output")

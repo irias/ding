@@ -15,6 +15,10 @@
 				<td><build-status status="buildResult.build.status"></build-status></td>
 			</tr>
 			<tr>
+				<td>Build</td>
+				<td>{{ buildResult.build.id }}</td>
+			</tr>
+			<tr>
 				<td>Branch</td>
 				<td>{{ buildResult.build.branch }}</td>
 			</tr>
@@ -34,11 +38,12 @@
 					<th>Arch</th>
 					<th>Toolchain</th>
 					<th>Link</th>
+					<th>Size</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr ng-if="buildResult.build.results.length === 0">
-					<td>No results</td>
+					<td colspan="7">No results</td>
 				</tr>
 				<tr ng-repeat="result in buildResult.build.results">
 					<td>{{ result.command }}</td>
@@ -47,6 +52,7 @@
 					<td>{{ result.arch }}</td>
 					<td>{{ result.toolchain }}</td>
 					<td><a ng-href="/results/{{ repo.name }}/{{ result.filename }}">{{ result.filename }}</a></td>
+					<td><filesize size="result.filesize"></filesize></td>
 				</tr>
 			</tbody>
 		</table>

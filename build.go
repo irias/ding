@@ -12,6 +12,7 @@ type Result struct {
 	Arch      string `json:"arch"`
 	Toolchain string `json:"toolchain"`
 	Filename  string `json:"filename"`
+	Filesize  int64  `json:"filesize"`
 }
 
 type Build struct {

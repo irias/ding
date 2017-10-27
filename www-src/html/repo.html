@@ -69,18 +69,22 @@
 						<td>Status</td>
 						<td>Branch</td>
 						<td>Results</td>
+						<td>Version</td>
+						<td>Build</td>
 						<td>When</td>
 						<td>Action</td>
 					</tr>
 				</thead>
 				<tbody>
 					<tr ng-if="builds.length === 0">
-						<td colspan="5">No builds</td>
+						<td colspan="7">No builds</td>
 					</tr>
 					<tr ng-repeat="build in builds">
 						<td><build-status status="build.status"></build-status></td>
 						<td>{{ build.branch }}</td>
 						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
+						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>
+						<td>{{ build.id }}</td>
 						<td><age time="build.start"></age></td>
 						<td>
 							<div class="btn-group">

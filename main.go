@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	DB_VERSION = 0
+	DB_VERSION = 1
 )
 
 var (
@@ -141,9 +141,7 @@ func main() {
 	check(err, "opening database connection")
 	var dbVersion int
 	err = database.QueryRow("select max(version) from schema_upgrades").Scan(&dbVersion)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err, "fetching database schema version")
 	if dbVersion != DB_VERSION {
 		log.Fatalf("bad database schema version, expected %d, saw %d", DB_VERSION, dbVersion)
 	}
