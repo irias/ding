@@ -432,6 +432,9 @@ func readFile(path string) string {
 }
 
 func parseInt(s string) int64 {
+	if s == "" {
+		return 0
+	}
 	v, err := strconv.ParseInt(s, 10, 64)
 	sherpaCheck(err, "parsing integer")
 	return v
