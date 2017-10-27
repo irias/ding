@@ -277,7 +277,7 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 				group by repo_id, branch
 			)
 		)
-		select json_agg(repobuilds.*)
+		select coalesce(json_agg(repobuilds.*), '[]')
 		from (
 			select row_to_json(repo.*) as repo, array_remove(array_agg(rbb.*), null) as builds
 			from repo
