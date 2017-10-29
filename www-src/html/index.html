@@ -45,7 +45,7 @@
 						<td>{{ build.branch }}</td>
 						<td>
 							<span class="label" ng-class="{'label-success': build.status === 'success', 'label-danger': build.status !== 'success'}">{{ build.status }}</span>
-							<div ng-if="build.finish && build.status !== 'status'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
+							<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
 {{ build.error_message }}</div>
 
 						</td>
