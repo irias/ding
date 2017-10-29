@@ -16,8 +16,9 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 	$scope.steps = buildResult.steps;
 
 	$scope.removeBuild = function() {
+		var build = $scope.build;
 		return Msg.confirm('Are you sure?', function() {
-			return api.removeBuild($scope.buildResult.build.id)
+			return api.removeBuild(build.id)
 			.then(function() {
 				$location.path('/repo/' + repo.name + '/');
 			});
