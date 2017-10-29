@@ -84,7 +84,7 @@
 				</tbody>
 				<tbody ng-repeat="build in builds">
 					<tr>
-						<td><build-status status="build.status"></build-status></td>
+						<td><build-status status="build.status" finish="build.finish"></build-status></td>
 						<td>{{ build.branch }}</td>
 						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
 						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>

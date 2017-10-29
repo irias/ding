@@ -14,7 +14,7 @@
 			<tr>
 				<td>Status</td>
 				<td>
-					<build-status status="build.status"></build-status>
+					<build-status status="build.status" finish="build.finish"></build-status>
 					<div ng-if="build.finish && build.status !== 'status'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
 {{ build.error_message }}</div>
 

@@ -6,9 +6,10 @@ app
 .directive('buildStatus', function() {
 	return {
 		restrict: 'E',
-		template: '<span class="label" ng-class="{\'label-success\': status === \'success\', \'label-danger\': status !== \'success\'}">{{ status }}</span>',
+		template: '<span class="label" ng-class="{\'label-success\': finish && status === \'success\', \'label-danger\': finish && status !== \'success\', \'label-default\': !finish}">{{ status }}</span>',
 		scope: {
-			'status': '='
+			'status': '=',
+			'finish': '='
 		}
 	};
 });
