@@ -38,7 +38,7 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 	};
 
 	$scope.retryBuild = function(build) {
-		return api.build(repo.name, build.branch, build.commit_hash).
+		return api.buildStart(repo.name, build.branch, build.commit_hash).
 		then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});
