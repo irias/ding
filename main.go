@@ -124,9 +124,8 @@ func init() {
 
 func main() {
 	log.SetFlags(0)
-	log.SetPrefix("ding: ")
 	flag.Usage = func() {
-		log.Println("usage: ding [flags] config.json")
+		fmt.Println("usage: ding [flags] config.json")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
