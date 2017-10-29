@@ -70,7 +70,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 }
 
 // Build a specific commit in the background, returning immediately.
-// `branch` can be empty, in which case the actual branch is determined after checkout of `commit`.
+// `Branch` can be empty, in which case the actual branch is determined after checkout of `commit`. `Commit` can also be empty, in which case a clone is done and the checked out commit is looked up.
 func (Ding) BuildStart(repoName, branch, commit string) Build {
 	repo, build, buildDir := _prepareBuild(repoName, branch, commit)
 	go func() {
@@ -194,6 +194,19 @@ Ding
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
 
+	if build.CommitHash == "" {
+		cmd := exec.Command("git", "rev-parse", "HEAD")
+		cmd.Dir = checkoutDir
+		buf, err := cmd.Output()
+		sherpaCheck(err, "finding commit hash")
+		build.CommitHash = strings.TrimSpace(string(buf))
+		if build.CommitHash == "" {
+			sherpaCheck(fmt.Errorf("cannot find commit hash"), "finding commit hash")
+		}
+		err = database.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.Id).Scan(&build.Id)
+		sherpaCheck(err, "updating commit hash in database")
+	}
+
 	_updateStatus("checkout")
 	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", build.CommitHash)
 	sherpaUserCheck(err, "checkout revision")
@@ -203,7 +216,7 @@ Ding
 		cmd.Dir = checkoutDir
 		buf, err := cmd.Output()
 		sherpaCheck(err, "determining branch for commit")
-		build.Branch = string(buf)
+		build.Branch = strings.TrimSpace(string(buf))
 		if build.Branch == "" {
 			sherpaCheck(fmt.Errorf("cannot determine branch for checkout"), "finding branch")
 		}

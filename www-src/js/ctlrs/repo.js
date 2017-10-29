@@ -43,4 +43,11 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});
 	};
+
+	$scope.buildBranch = function(build) {
+		return api.buildStart(repo.name, build.branch, '').
+		then(function(nbuild) {
+			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
+		});
+	};
 });

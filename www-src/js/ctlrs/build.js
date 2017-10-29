@@ -32,4 +32,12 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});
 	};
+
+	$scope.buildBranch = function() {
+		var build = $scope.build;
+		return api.buildStart(repo.name, build.branch, '').
+		then(function(nbuild) {
+			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
+		});
+	};
 });
