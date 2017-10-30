@@ -39,16 +39,23 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 	};
 
 	$scope.retryBuild = function(build) {
-		return api.createBuild(repo.name, build.branch, build.commit_hash).
-		then(function(nbuild) {
+		return api.createBuild(repo.name, build.branch, build.commit_hash)
+		.then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});
 	};
 
 	$scope.buildBranch = function(build) {
-		return api.createBuild(repo.name, build.branch, '').
-		then(function(nbuild) {
+		return api.createBuild(repo.name, build.branch, '')
+		.then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
+		});
+	};
+
+	$scope.createBuild = function(repoName, branch, commit) {
+		return api.createBuild(repoName, branch, commit)
+		.then(function(nbuild) {
+			$location.path('/repo/' + repoName + '/build/' + nbuild.id + '/');
 		});
 	};
 
