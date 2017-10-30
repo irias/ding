@@ -2,28 +2,34 @@ ding - build server
 
 Ding builds your software projects from git repositories.
 You will typically configure a "post-receive" hook on your git server to tell ding to start a build.
-Ding will start the compile, run tests, and make release binaries/files.
-All command output is kept around. If builds/tests go wrong, you can look at the output.
-Build dirs and release artefacts are kept around for some time, and garbage collected automatically after some time. However, you can mark binaries as released, so they will never be removed.
-Ding also lets you (makes you) write some scripts to set configuration files and requirements such as a database.
+Ding will start the compile, run tests, and make resulting binaries/files.  Such results can be promoted to a release.
+
+All command output of a build is kept around. If builds/tests go wrong, you can look at the output.
+Build dirs are kept around for some time, and garbage collected automatically when you have more than 10 builds, or after 2 weeks.
 
 Dingkick can be used in a git hook to signal that a build should start.
 
+
 # Todo
 
-- implement button to "build latest version of branch"?
-- clone & checkout also through shell script?
-- add shell script to cleanup after a build. eg dropping a database.
-- timestamps in output lines?
-- test with more repositories
-- security: can (should) we run the builds as a separate user? how to make sure the build cannot touch files outside of its own directory?
-- how to clean up builds? we currently keep all the checkouts as is. should remove after certain time or certain number of builds per repo, so we don't clog the disk.  we should also be able to remove the build dirs while keeping the resulting binaries (and perhaps store the resulting binaries with gzip, can add up with these big go binaries).
-- button to restart a build with same scripts
 - make this work with github repos, perhaps bitbucket as well.  requires having a public face. that requires adding auth...
 - get live updates during builds using SSE or something similar
 - do some extra steps? like coverage checking, and displaying the results.
+- add docs, at least a page describing the design.
 
-# steps
+## Maybe
+- clone & checkout also through shell script?
+- add shell script to cleanup after a build? eg dropping a database.
+- add shell file that can be sourced in the other scripts, for common code?
+- timestamps in output lines?
+- security: can we run the builds as a separate user? how to make sure the build cannot touch files outside of its own directory?
+- be more helpful for building go projects by putting the checkout dir in place that can be used as gopath, in what is probably the right path (git.example.com:yourname.git -> git.example.com/yourname)?
+- compress released files with gzip and serve them gzipped if possible
+
+
+# Design
+
+## steps
 - clone
 - checkout
 - build
@@ -31,7 +37,7 @@ Dingkick can be used in a git hook to signal that a build should start.
 - release
 - success
 
-# files
+## directory layout
 - config/<repo>/
 	build.sh
 	test.sh
@@ -44,5 +50,5 @@ Dingkick can be used in a git hook to signal that a build should start.
 		release.sh
 	output/
 		{build,test,release}.{stdout,stderr,output,nsec}
-- release/<repo>/
+- release/<repo>/<buildID>
 	filename
