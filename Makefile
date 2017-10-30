@@ -10,7 +10,7 @@ frontend:
 	python www-src/build.py
 
 test:
-	go test -- local/config-test.json
+	go test -cover -- local/config-test.json
 
 release: clean
 	./release.sh
