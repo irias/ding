@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"bitbucket.org/mjl/httpasset"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	DB_VERSION = 3
+	DB_VERSION = 4
 )
 
 var (
@@ -177,7 +178,8 @@ func main() {
 	http.HandleFunc("/", serveAsset)
 	http.Handle("/ding/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/results/", serveResult)
+	http.HandleFunc("/release/", serveRelease)
+	http.HandleFunc("/result/", serveResult)
 
 	log.Printf("version %s, listening on %s\n", version, *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
@@ -220,15 +222,71 @@ func serveAsset(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, r.URL.Path, info.ModTime(), f)
 }
 
+func serveRelease(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "bad method", 405)
+		return
+	}
+	t := strings.Split(r.URL.Path[1:], "/")
+	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, fmt.Sprintf("release/%s/%s/%s", t[1], t[2], t[3]))
+}
+
 func serveResult(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "bad method", 405)
 		return
 	}
 	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 3 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." {
+	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, fmt.Sprintf("release/%s/%s", t[1], t[2]))
+	repoName := t[1]
+	buildId, err := strconv.Atoi(t[2])
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	basename := t[3]
+
+	fail := func(err error) {
+		log.Printf("error fetching result: %s\n", err)
+		http.Error(w, "internal error", 500)
+	}
+
+	q := `
+		select result.filename
+		from result
+		join build on result.build_id = build.id
+		join repo on build.repo_id = repo.id
+		where repo.name=$1 and build.id=$2
+	`
+	rows, err := database.Query(q, repoName, buildId)
+	if err != nil {
+		fail(err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		err = rows.Scan(&name)
+		if err != nil {
+			fail(err)
+			return
+		}
+		if strings.HasSuffix(name, "/"+basename) {
+			path := fmt.Sprintf("build/%s/%d/checkout/%s/%s", repoName, buildId, repoName, name)
+			http.ServeFile(w, r, path)
+			return
+		}
+	}
+	if err = rows.Err(); err != nil {
+		fail(err)
+		return
+	}
+	http.NotFound(w, r)
 }

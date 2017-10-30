@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -101,6 +102,10 @@ func _doBuild(repo Repo, build Build, buildDir string) Build {
 	defer func() {
 		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
 		sherpaCheck(err, "marking build as finished in database")
+
+		if build.Branch != "" {
+			_cleanupBuilds(repo.Name, build.Branch)
+		}
 
 		r := recover()
 		if r != nil {
@@ -243,9 +248,8 @@ Ding
 		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename, filesize) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 		for _, result := range results {
 			var id int
-			err = tx.QueryRow(qins, build.Id, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, path.Base(result.Filename), result.Filesize).Scan(&id)
+			err = tx.QueryRow(qins, build.Id, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, result.Filename, result.Filesize).Scan(&id)
 			sherpaCheck(err, "inserting result into database")
-			fileCopy(result.Filename, fmt.Sprintf("release/%s/%s", repo.Name, path.Base(result.Filename)))
 		}
 
 		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
@@ -302,6 +306,7 @@ func parseResults(checkoutDir, path string) (results []Result) {
 		}
 		info, err := os.Stat(result.Filename)
 		sherpaUserCheck(err, "testing whether released file exists")
+		result.Filename = result.Filename[len(checkoutDir+"/"):]
 		result.Filesize = info.Size()
 		results = append(results, result)
 	}
@@ -388,6 +393,46 @@ func run(env []string, stage, buildDir, workDir, command string, args ...string)
 	}
 	stderr = nil
 	return nil
+}
+
+func toJSON(v interface{}) string {
+	buf, err := json.Marshal(v)
+	sherpaCheck(err, "encoding to json")
+	return string(buf)
+}
+
+// Release a build.
+func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
+	transact(func(tx *sql.Tx) {
+		build = _build(tx, repoName, buildId)
+		if build.Finish == nil {
+			panic(&sherpa.Error{Code: "userError", Message: "Build has not finished yet"})
+		}
+		if build.Status != "success" {
+			panic(&sherpa.Error{Code: "userError", Message: "Build was not successful"})
+		}
+
+		br := _buildResult(repoName, build)
+		buildConfig := toJSON(br.BuildConfig)
+		steps := toJSON(br.Steps)
+
+		qrel := `insert into release (build_id, time, build_config, steps) values ($1, now(), $2::json, $3::json) returning build_id`
+		err := tx.QueryRow(qrel, build.Id, buildConfig, steps).Scan(&build.Id)
+		sherpaCheck(err, "inserting release into database")
+
+		qup := `update build set released=now() where id=$1 returning id`
+		err = tx.QueryRow(qup, build.Id).Scan(&build.Id)
+		sherpaCheck(err, "marking build as released in database")
+
+		var filenames []string
+		q := `select coalesce(json_agg(result.filename), '[]') from result where build_id=$1`
+		checkParseRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
+		checkoutDir := fmt.Sprintf("build/%s/%d/checkout/%s", repoName, build.Id, repoName)
+		for _, filename := range filenames {
+			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
+		}
+	})
+	return
 }
 
 // RepoBuilds returns all repositories and their latest build per branch (always for master & develop, for other branches only if the latest build was less than 4 weeks ago).
@@ -519,6 +564,19 @@ func readFile(path string) string {
 	return string(buf)
 }
 
+func readFileLax(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	buf, err := ioutil.ReadAll(f)
+	f.Close()
+	if err != nil {
+		return ""
+	}
+	return string(buf)
+}
+
 func parseInt(s string) int64 {
 	if s == "" {
 		return 0
@@ -543,12 +601,8 @@ func (Ding) RepoConfig(repoName string) (rc RepoConfig) {
 	return
 }
 
-func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
-	transact(func(tx *sql.Tx) {
-		br.Build = _build(tx, repoName, buildId)
-	})
-
-	buildDir := fmt.Sprintf("build/%s/%d/", repoName, buildId)
+func _buildResult(repoName string, build Build) (br BuildResult) {
+	buildDir := fmt.Sprintf("build/%s/%d/", repoName, build.Id)
 	br.BuildConfig.BuildScript = readFile(buildDir + "scripts/build.sh")
 	br.BuildConfig.TestScript = readFile(buildDir + "scripts/test.sh")
 	br.BuildConfig.ReleaseScript = readFile(buildDir + "scripts/release.sh")
@@ -561,10 +615,10 @@ func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
 		} else {
 			step = Step{
 				Name:   stepName,
-				Stdout: readFile(outputDir + stepName + ".stdout"),
-				Stderr: readFile(outputDir + stepName + ".stderr"),
-				Output: readFile(outputDir + stepName + ".output"),
-				Nsec:   parseInt(readFile(outputDir + stepName + ".nsec")),
+				Stdout: readFileLax(outputDir + stepName + ".stdout"),
+				Stderr: readFileLax(outputDir + stepName + ".stderr"),
+				Output: readFileLax(outputDir + stepName + ".output"),
+				Nsec:   parseInt(readFileLax(outputDir + stepName + ".nsec")),
 			}
 		}
 		br.Steps = append(br.Steps, step)
@@ -575,32 +629,104 @@ func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
 	return
 }
 
-// Remove build. Both from database and all local files.
+func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
+	var build Build
+	transact(func(tx *sql.Tx) {
+		build = _build(tx, repoName, buildId)
+	})
+	br = _buildResult(repoName, build)
+	br.Build = build
+	return
+}
+
+// Fetch build config and results for a release.
+func (Ding) Release(repoName string, buildId int) (br BuildResult) {
+	transact(func(tx *sql.Tx) {
+		build := _build(tx, repoName, buildId)
+
+		q := `select row_to_json(release.*) from release where build_id=$1`
+		checkParseRow(tx.QueryRow(q, buildId), &br, "fetching release from database")
+		br.Build = build
+	})
+	return
+}
+
+// Remove build completely. Both from database and all local files.
 func (Ding) RemoveBuild(buildId int) {
 	var repoName string
 	transact(func(tx *sql.Tx) {
 		qrepo := `select to_json(repo.name) from build join repo on build.repo_id = repo.id where build.id = $1`
 		checkParseRow(tx.QueryRow(qrepo, buildId), &repoName, "fetching repo name from database")
 
-		var filenames []string
-		qres := `select coalesce(json_agg(filename), '[]') from result where build_id=$1`
-		checkParseRow(tx.QueryRow(qres, buildId), &filenames, "fetching released files")
-
-		_, err := tx.Exec(`delete from result where build_id=$1`, buildId)
-		sherpaCheck(err, "removing results from database")
-
-		q := `delete from build where id=$1 returning id`
-		checkParseRow(tx.QueryRow(q, buildId), &buildId, "removing build from database")
-
-		for _, filename := range filenames {
-			path := fmt.Sprintf("release/%s/%s", repoName, filename)
-			err = os.Remove(path)
-			if err != nil {
-				log.Printf("removing %s: %s\n", path, err)
-			}
+		build := _build(tx, repoName, buildId)
+		if build.Released != nil {
+			panic(&sherpa.Error{Code: "userError", Message: "Build has been released, cannot be removed"})
 		}
+
+		_removeBuild(tx, repoName, buildId)
 	})
+}
+
+func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
+	var filenames []string
+	qres := `select coalesce(json_agg(filename), '[]') from result where build_id=$1`
+	checkParseRow(tx.QueryRow(qres, buildId), &filenames, "fetching released files")
+
+	_, err := tx.Exec(`delete from result where build_id=$1`, buildId)
+	sherpaCheck(err, "removing results from database")
+
+	q := `delete from build where id=$1 returning id`
+	checkParseRow(tx.QueryRow(q, buildId), &buildId, "removing build from database")
+
 	buildDir := fmt.Sprintf("build/%s/%d", repoName, buildId)
-	err := os.RemoveAll(buildDir)
+	err = os.RemoveAll(buildDir)
 	sherpaCheck(err, "removing build directory")
+}
+
+// Clean up (remove) the build dir.  This does not remove the build itself from the database.
+func (Ding) CleanupBuilddir(repoName string, buildId int) (build Build) {
+	transact(func(tx *sql.Tx) {
+		build = _build(tx, repoName, buildId)
+		if build.BuilddirRemoved {
+			panic(&sherpa.Error{Code: "userError", Message: "Builddir already removed"})
+		}
+
+		_removeBuilddir(tx, repoName, buildId)
+		build = _build(tx, repoName, buildId)
+		fillBuild(repoName, &build)
+	})
+	return
+}
+
+func _removeBuilddir(tx *sql.Tx, repoName string, buildId int) {
+	err := tx.QueryRow("update build set builddir_removed=true where id=$1 returning id", buildId).Scan(&buildId)
+	sherpaCheck(err, "marking builddir as removed in database")
+
+	buildDir := fmt.Sprintf("build/%s/%d", repoName, buildId)
+	err = os.RemoveAll(buildDir)
+	sherpaCheck(err, "removing build directory")
+}
+
+func _cleanupBuilds(repoName, branch string) {
+	var builds []Build
+	q := `
+		select coalesce(json_agg(x.* order by x.id desc), '[]')
+		from (
+			select build.*
+			from build join repo on build.repo_id = repo.id
+			where repo.name=$1 and build.branch=$2
+		) x
+	`
+	checkParseRow(database.QueryRow(q, repoName, branch), &builds, "fetching builds from database")
+	now := time.Now()
+	for index, b := range builds {
+		if index == 0 || b.Released != nil {
+			continue
+		}
+		if index >= 10 || (b.Finish != nil && now.Sub(*b.Finish) > 14*24*3600*time.Second) {
+			transact(func(tx *sql.Tx) {
+				_removeBuild(tx, repoName, b.Id)
+			})
+		}
+	}
 }

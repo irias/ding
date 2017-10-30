@@ -84,7 +84,7 @@
 				</tbody>
 				<tbody ng-repeat="build in builds">
 					<tr>
-						<td><build-status status="build.status" finish="build.finish"></build-status></td>
+						<td><build-status status="build.status" finish="build.finish" released="build.released"></build-status></td>
 						<td>{{ build.branch }}</td>
 						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
 						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>
@@ -94,10 +94,31 @@
 						<td><age time="build.start"></age></td>
 						<td>
 							<div class="btn-group">
-								<a ng-href="#/repo/{{ repo.name }}/build/{{ build.id }}/" btn="default sm">Open</a>
-								<button btn="danger sm" icon="trash" loading-click="removeBuild(build)">Delete</button>
-								<button btn="default sm" icon="cog" saving-click="retryBuild(build)">Retry build</button>
-								<button btn="default sm" icon="cog" saving-click="buildBranch(build)">Rebuild branch</button>
+								<div class="btn-group" uib-dropdown>
+									<button btn="default sm" icon="cog" saving-click="retryBuild(build)">Retry</button>
+									<button type="button" btn="default sm" uib-dropdown-toggle>
+										<span class="caret"></span>
+										<span class="sr-only">split button</span>
+									</button>
+									<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
+										<li role="menuitem">
+											<a icon="cog" saving-click="buildBranch(build)">Rebuild branch latest</a>
+										</li>
+									</ul>
+								</div>
+								<div class="btn-group" uib-dropdown>
+									<button btn="danger sm" icon="trash" loading-click="cleanupBuilddir(build)" ng-disabled="build.builddir_removed">Cleanup</button>
+									<button type="button" btn="danger sm" uib-dropdown-toggle>
+										<span class="caret"></span>
+										<span class="sr-only">split button</span>
+									</button>
+									<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
+										<li role="menuitem">
+											<a icon="trash" loading-click="removeBuild(build)">Delete build</a>
+										</li>
+									</ul>
+								</div>
+								<a ng-href="#/repo/{{ repo.name }}/build/{{ build.id }}/" btn="default sm" ng-disabled="build.builddir_removed">Open</a>
 							</div>
 						</td>
 					</tr>
@@ -105,6 +126,45 @@
 						<td colspan="9">
 							<div style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
 {{ build.error_message }}</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="col-xs-12 col-lg-6">
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<div class="panel-title">Releases</div>
+			</div>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<td>Branch</td>
+						<td>Results</td>
+						<td>Version</td>
+						<td>Build</td>
+						<td>Age</td>
+						<td>Action</td>
+					</tr>
+				</thead>
+				<tbody ng-if="releaseBuilds.length === 0">
+					<tr>
+						<td colspan="6">No releases</td>
+					</tr>
+				</tbody>
+				<tbody ng-repeat="build in releaseBuilds">
+					<tr>
+						<td>{{ build.branch }}</td>
+						<td><span ng-if="build.results.length === 1">1 file</span><span ng-if="build.results.length > 1">{{ build.results.length }} files</span></td>
+						<td><span ng-if="build.results.length > 0">{{ build.results[0].version }}</span></td>
+						<td>{{ build.id }}</td>
+						<td><age time="build.start"></age></td>
+						<td>
+							<div class="btn-group">
+								<a ng-href="#/repo/{{ repo.name }}/release/{{ build.id }}/" btn="default sm">Open</a>
+							</div>
 						</td>
 					</tr>
 				</tbody>

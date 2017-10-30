@@ -1,28 +1,7 @@
 <div class="row">
-	<div class="col-xs-12">
-		<div class="btn-group page-buttons">
-			<button btn="danger" icon="trash" loading-click="removeBuild()" ng-disabled="build.released">Remove build</button>
-			<button btn="danger" icon="trash" loading-click="cleanupBuilddir()">Clean up builddir</button>
-			<button btn="default" icon="cog" saving-click="retryBuild()">Retry build</button>
-			<button btn="default" icon="cog" saving-click="buildBranch()">Rebuild branch</button>
-			<button btn="primary" icon="cog" saving-click="release()" ng-disabled="build.released">Release</button>
-		</div>
-	</div>
-</div>
-
-<div class="row">
 	<div class="col-xs-12 col-lg-6">
-		<h2>Build</h2>
+		<h2>Release</h2>
 		<table class="table">
-			<tr>
-				<td>Status</td>
-				<td>
-					<build-status status="build.status" finish="build.finish" released="build.released"></build-status>
-					<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
-{{ build.error_message }}</div>
-
-				</td>
-			</tr>
 			<tr>
 				<td>Build</td>
 				<td>{{ build.id }}</td>
@@ -45,7 +24,7 @@
 			</tr>
 		</table>
 
-		<h2>Results</h2>
+		<h2>Released files</h2>
 		<table class="table">
 			<thead>
 				<tr>
@@ -68,7 +47,7 @@
 					<td>{{ result.os }}</td>
 					<td>{{ result.arch }}</td>
 					<td>{{ result.toolchain }}</td>
-					<td><a ng-href="/result/{{ repo.name }}/{{ build.id }}/{{ result.filename | basename }}">{{ result.filename | basename }}</a></td>
+					<td><a ng-href="/release/{{ repo.name }}/{{ build.id }}/{{ result.filename | basename }}">{{ result.filename | basename }}</a></td>
 					<td><filesize size="result.filesize"></filesize></td>
 				</tr>
 			</tbody>

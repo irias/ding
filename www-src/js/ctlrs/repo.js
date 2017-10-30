@@ -12,6 +12,7 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 	$scope.repo = repo;
 	$scope.repo_config = repo_config;
 	$scope.builds = builds;
+	$scope.releaseBuilds = _.filter($scope.builds, function(b) { return b.released; });
 
 	$scope.removeRepo = function() {
 		return Msg.confirm('Are you sure?', function() {
@@ -48,6 +49,15 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 		return api.buildStart(repo.name, build.branch, '').
 		then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
+		});
+	};
+
+	$scope.cleanupBuilddir = function(build) {
+		return api.cleanupBuilddir(repo.name, build.id)
+		.then(function(nbuild) {
+			$scope.builds = _.map($scope.builds, function(b) {
+				return b.id === build.id ? nbuild : b;
+			});
 		});
 	};
 });

@@ -9,7 +9,6 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 		Util.crumb('build/' + buildResult.build.id + '/', 'Build ' + buildResult.build.id)
 	]);
 
-
 	$scope.repo = repo;
 	$scope.build = buildResult.build;
 	$scope.build_config = buildResult.build_config;
@@ -38,6 +37,22 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 		return api.buildStart(repo.name, build.branch, '').
 		then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
+		});
+	};
+
+	$scope.release = function() {
+		var build = $scope.build;
+		return api.createRelease(repo.name, build.id)
+		.then(function(nbuild) {
+			$location.path('/repo/' + repo.name + '/release/' + build.id + '/');
+		});
+	};
+
+	$scope.cleanupBuilddir = function() {
+		var build = $scope.build;
+		return api.cleanupBuilddir(repo.name, build.id)
+		.then(function(nbuild) {
+			$location.path('/repo/' + repo.name + '/');
 		});
 	};
 });

@@ -47,6 +47,18 @@ app.config(function($routeProvider, $uibTooltipProvider) {
 			}
 		}
 	})
+	.when('/repo/:repoName/release/:buildId/', {
+		templateUrl: 'static/html/release.html',
+		controller: 'Release',
+		resolve: {
+			repo: function($route) {
+				return api.repo($route.current.params.repoName);
+			},
+			buildResult: function($route) {
+				return api.release($route.current.params.repoName, parseInt($route.current.params.buildId));
+			}
+		}
+	})
 	.otherwise({
 		templateUrl: 'static/html/404.html'
 	});

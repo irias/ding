@@ -44,7 +44,7 @@
 						</td>
 						<td>{{ build.branch }}</td>
 						<td>
-							<build-status status="build.status" finish="build.finish"></build-status>
+							<build-status status="build.status" finish="build.finish" released="build.released"></build-status>
 							<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
 {{ build.error_message }}</div>
 
@@ -55,7 +55,7 @@
 							</td>
 						<td><age time="build.start"></age></td>
 						<td>
-							<a class="btn btn-default" ng-href="#/repo/{{ repoBuild.repo.name }}/build/{{ build.id }}/">Open</a>
+							<a class="btn btn-default" ng-href="#/repo/{{ repoBuild.repo.name }}/build/{{ build.id }}/" ng-disabled="build.builddir_removed">Open</a>
 						</td>
 					</tr>
 				</tbody>
