@@ -29,7 +29,7 @@ def build(dest):
 		srcdir + 'js/app.js',
 		srcdir + 'js/app.config.js',
 		] \
-		+ bl.dirlist(srcdir + 'js/ctlrs', suffix='.js') \
+		+ bl.dirlist(srcdir + 'js/ctlr', suffix='.js') \
 		+ bl.dirlist(srcdir + 'js/directives', suffix='.js') \
 		+ bl.dirlist(srcdir + 'js/filters', suffix='.js') \
 		+ bl.dirlist(srcdir + 'js/services', suffix='.js')
