@@ -72,7 +72,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 
 // Build a specific commit in the background, returning immediately.
 // `Branch` can be empty, in which case the actual branch is determined after checkout of `commit`. `Commit` can also be empty, in which case a clone is done and the checked out commit is looked up.
-func (Ding) BuildStart(repoName, branch, commit string) Build {
+func (Ding) CreateBuild(repoName, branch, commit string) Build {
 	repo, build, buildDir := _prepareBuild(repoName, branch, commit)
 	go func() {
 		defer func() {
@@ -87,15 +87,6 @@ func (Ding) BuildStart(repoName, branch, commit string) Build {
 		_doBuild(repo, build, buildDir)
 	}()
 	return build
-}
-
-// Build a specific commit.
-func (Ding) Build(repoName, branch, commit string) (build Build) {
-	var repo Repo
-	var buildDir string
-	repo, build, buildDir = _prepareBuild(repoName, branch, commit)
-	build = _doBuild(repo, build, buildDir)
-	return
 }
 
 func _doBuild(repo Repo, build Build, buildDir string) Build {

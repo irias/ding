@@ -26,7 +26,7 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 
 	$scope.retryBuild = function() {
 		var build = $scope.build;
-		return api.buildStart(repo.name, build.branch, build.commit_hash).
+		return api.createBuild(repo.name, build.branch, build.commit_hash).
 		then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});
@@ -34,7 +34,7 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 
 	$scope.buildBranch = function() {
 		var build = $scope.build;
-		return api.buildStart(repo.name, build.branch, '').
+		return api.createBuild(repo.name, build.branch, '').
 		then(function(nbuild) {
 			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
 		});

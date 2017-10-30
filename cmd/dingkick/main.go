@@ -45,7 +45,7 @@ func main() {
 	var build struct {
 		Id int64
 	}
-	err = client.Call(&build, "buildStart", repoName, branch, commit)
+	err = client.Call(&build, "createBuild", repoName, branch, commit)
 	check(err, "building")
 	_, err = fmt.Println("buildId", build.Id)
 	check(err, "write")
