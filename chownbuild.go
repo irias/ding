@@ -28,15 +28,18 @@ func chownbuild(args []string) {
 	check(err, "parsing uid")
 	gid, err := strconv.Atoi(args[2])
 	check(err, "parsing gid")
-	if uid != config.SudoUid && !(uid >= config.SudoUidStart && uid < config.SudoUidEnd) {
-		log.Fatalf("uid %d not allowed, not config.SudoUid %d and not between config.SudoUidStart %d and config.SudoUidEnd %d\n", uid, config.SudoUid, config.SudoUidStart, config.SudoUidEnd)
+	if !config.IsolateBuilds.Enabled {
+		log.Fatalln("isolate buids not enabled")
 	}
-	if gid != config.SudoGid {
-		log.Fatalf("gid %d not allowed, not config.SudoGid %d\n", gid, config.SudoGid)
+	if uid != config.IsolateBuilds.DingUid && !(uid >= config.IsolateBuilds.UidStart && uid < config.IsolateBuilds.UidEnd) {
+		log.Fatalf("uid %d not allowed, not config.IsolateBuilds.DingUid %d and not between config.IsolateBuilds.UidStart %d and config.IsolateBuilds.UidEnd %d\n", uid, config.IsolateBuilds.DingUid, config.IsolateBuilds.UidStart, config.IsolateBuilds.UidEnd)
+	}
+	if gid != config.IsolateBuilds.DingGid {
+		log.Fatalf("gid %d not allowed, not config.IsolateBuilds.DingGid %d\n", gid, config.IsolateBuilds.DingGid)
 	}
 	for _, path := range args[3:] {
-		if !strings.HasPrefix(path, config.BuildsDir) {
-			log.Fatalf("path %s not within config.BuildsDir %s\n", path, config.BuildsDir)
+		if !strings.HasPrefix(path, config.IsolateBuilds.BuildsDir) {
+			log.Fatalf("path %s not within config.BuildsDir %s\n", path, config.IsolateBuilds.BuildsDir)
 		}
 		if strings.Contains(path, "..") {
 			log.Fatalf("path %s contains suspect ..\n", path)

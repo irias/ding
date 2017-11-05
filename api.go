@@ -91,7 +91,7 @@ func (Ding) CreateBuild(repoName, branch, commit string) Build {
 }
 
 func calcUid(buildId int) int {
-	return config.SudoUidStart + buildId%(config.SudoUidEnd-config.SudoUidStart)
+	return config.IsolateBuilds.UidStart + buildId%(config.IsolateBuilds.UidEnd-config.IsolateBuilds.UidStart)
 }
 
 func _doBuild(repo Repo, build Build, buildDir string) Build {
@@ -200,8 +200,8 @@ Ding
 	}
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
-	if config.SudoBuild {
-		chownBuild := append(config.ChownBuild, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.SudoGid), buildDir+"/checkout", buildDir+"/home")
+	if config.IsolateBuilds.Enabled {
+		chownBuild := append(config.IsolateBuilds.ChownBuild, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid), buildDir+"/checkout", buildDir+"/home")
 		cmd := execCommand(chownBuild...)
 		cmd.Dir = buildDir
 		output, err := cmd.CombinedOutput()
@@ -210,10 +210,10 @@ Ding
 		}
 	}
 
-	// from now on, we run commands under its own uid, if config.SudoBuild is set.
-	RUNAS := append(config.Runas, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.SudoGid))
+	// from now on, we run commands under its own uid, if config.IsolateBuilds is on.
+	RUNAS := append(config.IsolateBuilds.Runas, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid))
 	runas := func(args ...string) []string {
-		if config.SudoBuild {
+		if config.IsolateBuilds.Enabled {
 			return append(RUNAS, args...)
 		}
 		return args
@@ -709,10 +709,10 @@ func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 }
 
 func _removeDir(path string) {
-	if config.SudoBuild {
+	if config.IsolateBuilds.Enabled {
 		user, err := user.Current()
 		sherpaCheck(err, "getting current uid/gid")
-		chownbuild := append(config.ChownBuild, string(user.Uid), string(user.Gid), path)
+		chownbuild := append(config.IsolateBuilds.ChownBuild, string(user.Uid), string(user.Gid), path)
 		cmd := exec.Command(chownbuild[0], chownbuild[1:]...)
 		buf, err := cmd.CombinedOutput()
 		if err != nil {

@@ -91,6 +91,27 @@ def build(dest):
 		d = target(name)
 		s = srcdir + name
 		bl.test(d, [s], lambda: bl.copy(d, s))
+
+	s = 'INSTALL.md'
+	d = target(s)
+	bl.test(d, [s], lambda: bl.copy(d, s))
+
+	sql = []
+	for f in sorted(os.listdir('sql')):
+		if not re.search('[0-9]{3}-.*\\.sql', f):
+			continue
+		versionstr = f.split('-')[0]
+		if versionstr == '000':
+			version = 0
+		else:
+			version = int(versionstr, 10)
+		sql.append(dict(version=version, filename=f))
+	def sql_json():
+		for e in sql:
+			e['sql'] = open('sql/' + e['filename']).read()
+		return json.dumps(sql)
+	d = target('sql.json')
+	bl.test(d, ['sql'] + ['sql/' + e['filename'] for e in sql], lambda: bl.write(d, sql_json()))
 	
 
 def usage():

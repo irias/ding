@@ -30,16 +30,18 @@ var (
 			Name  string
 			Email string
 		}
-		BaseURL      string
-		SudoBuild    bool     // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
-		SudoUidStart int      // we'll use this + buildId as the unix uid to run the commands under
-		SudoUidEnd   int      // if we reach this uid, we wrap around to sudoUidStart again
-		SudoUid      int      // the unix uid ding runs as, used to chown files back before deleting.
-		SudoGid      int      // the unix gid ding runs as, used to run build commands under.
-		Runas        []string // if SudoBuild is true, the build commands are prepended with: these parameters, followed by a uid to run as, followed by a gid to run as.
-		ChownBuild   []string // if SudoBuild is true, this command is executed and must restore file permissions in the build directory so files can be removed by ding.  this command is run with these parameters: uid, gid, one or more paths.
-		BuildsDir    string   // absolute path to the build/ directory, for checking by chownbuild
-		Mail         struct {
+		BaseURL       string
+		IsolateBuilds struct {
+			Enabled    bool     // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
+			UidStart   int      // we'll use this + buildId as the unix uid to run the commands under
+			UidEnd     int      // if we reach this uid, we wrap around to uidStart again
+			DingUid    int      // the unix uid ding runs as, used to chown files back before deleting.
+			DingGid    int      // the unix gid ding runs as, used to run build commands under.
+			Runas      []string // if enabled is true, the build commands are prepended with: these parameters, followed by a uid to run as, followed by a gid to run as.
+			ChownBuild []string // if enabled is true, this command is executed and must restore file permissions in the build directory so files can be removed by ding.  this command is run with these parameters: uid, gid, one or more paths.
+			BuildsDir  string   // absolute path to the build/ directory, for checking by chownbuild
+		}
+		Mail struct {
 			Enabled,
 			SmtpTls bool
 			SmtpPort int
@@ -82,8 +84,11 @@ func parseConfig(path string) {
 func main() {
 	log.SetFlags(0)
 	flag.Usage = func() {
-		fmt.Println("usage: ding [flags] serve config.json")
-		fmt.Println("usage: ding [flags] chownbuild config.json uid gid path")
+		fmt.Fprintln(os.Stderr, "usage: ding help")
+		fmt.Fprintln(os.Stderr, "       ding serve config.json")
+		fmt.Fprintln(os.Stderr, "       ding chownbuild config.json uid gid path")
+		fmt.Fprintln(os.Stderr, "       ding upgrade config.json [commit]")
+		fmt.Fprintln(os.Stderr, "       ding version")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -93,11 +98,29 @@ func main() {
 		os.Exit(2)
 	}
 
-	switch args[0] {
+	cmd := args[0]
+	args = args[1:]
+	switch cmd {
+	case "help":
+		help(args)
 	case "serve":
-		serve(args[1:])
+		serve(args)
 	case "chownbuild":
-		chownbuild(args[1:])
+		chownbuild(args)
+	case "upgrade":
+		upgrade(args)
+	case "version":
+		fl := flag.NewFlagSet(cmd, flag.ExitOnError)
+		fl.Usage = func() {
+			fmt.Println("usage: ding version")
+			fl.PrintDefaults()
+		}
+		fl.Parse(args)
+		if len(fl.Args()) != 0 {
+			fl.Usage()
+			os.Exit(2)
+		}
+		fmt.Printf("%s\ndatabase schema version %d\n", version, DB_VERSION)
 	default:
 		flag.Usage()
 	}
