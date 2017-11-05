@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"path"
 	"strconv"
 	"strings"
@@ -180,18 +181,39 @@ Ding
 		env = append(env, key+"="+value)
 	}
 
+	execCommand := func(args ...string) *exec.Cmd {
+		return exec.Command(args[0], args[1:]...)
+	}
+
 	_updateStatus("clone")
 	var err error
+	// we clone without hard links because we chown later, don't want to mess up local git source repo's
+	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
 	if build.Branch == "" {
-		err = run(env, "clone", buildDir, buildDir, "git", "clone", repo.Origin, "checkout/"+repo.Name)
+		err = run(env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
 	} else {
-		err = run(env, "clone", buildDir, buildDir, "git", "clone", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
+		err = run(env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
 	}
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
+	if config.SudoBuild {
+		cmd := execCommand("sudo", "chown", "-R", fmt.Sprintf("%d:%s", config.SudoUidBase+build.Id, config.SudoGroup), buildDir+"/checkout", buildDir+"/home")
+		cmd.Dir = buildDir
+		err = cmd.Run()
+		sherpaCheck(err, "setting owner/group on checkout and home directory")
+	}
+
+	// from now on, we run commands under its own uid, if config.SudoBuild is set.
+	SUDO := []string{"sudo", "-u", fmt.Sprintf("#%d", config.SudoUidBase+build.Id), "-g", config.SudoGroup}
+	sudo := func(args ...string) []string {
+		if config.SudoBuild {
+			return append(SUDO, args...)
+		}
+		return args
+	}
 
 	if build.CommitHash == "" {
-		cmd := exec.Command("git", "rev-parse", "HEAD")
+		cmd := execCommand(sudo("git", "rev-parse", "HEAD")...)
 		cmd.Dir = checkoutDir
 		buf, err := cmd.Output()
 		sherpaCheck(err, "finding commit hash")
@@ -204,11 +226,11 @@ Ding
 	}
 
 	_updateStatus("checkout")
-	err = run(env, "checkout", buildDir, checkoutDir, "git", "checkout", build.CommitHash)
+	err = run(env, "checkout", buildDir, checkoutDir, sudo("git", "checkout", build.CommitHash)...)
 	sherpaUserCheck(err, "checkout revision")
 
 	if build.Branch == "" {
-		cmd := exec.Command("sh", "-c", `git branch | sed 's/^..//' | grep -v "(HEAD detached at" | head -n1`)
+		cmd := execCommand(sudo("sh", "-c", `git branch | sed 's/^..//' | grep -v "(HEAD detached at" | head -n1`)...)
 		cmd.Dir = checkoutDir
 		buf, err := cmd.Output()
 		sherpaCheck(err, "determining branch for commit")
@@ -221,15 +243,15 @@ Ding
 	}
 
 	_updateStatus("build")
-	err = run(env, "build", buildDir, checkoutDir, "../../scripts/build.sh")
+	err = run(env, "build", buildDir, checkoutDir, sudo("../../scripts/build.sh")...)
 	sherpaUserCheck(err, "building")
 
 	_updateStatus("test")
-	err = run(env, "test", buildDir, checkoutDir, "../../scripts/test.sh")
+	err = run(env, "test", buildDir, checkoutDir, sudo("../../scripts/test.sh")...)
 	sherpaUserCheck(err, "running tests")
 
 	_updateStatus("release")
-	err = run(env, "release", buildDir, checkoutDir, "../../scripts/release.sh")
+	err = run(env, "release", buildDir, checkoutDir, sudo("../../scripts/release.sh")...)
 	sherpaUserCheck(err, "publishing build")
 
 	transact(func(tx *sql.Tx) {
@@ -321,8 +343,8 @@ func _copyScript(src, dst string) {
 	sherpaCheck(err, "copy script: chmod")
 }
 
-func run(env []string, stage, buildDir, workDir, command string, args ...string) (err error) {
-	cmd := exec.Command(command, args...)
+func run(env []string, stage, buildDir, workDir string, args ...string) (err error) {
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = workDir
 	cmd.Env = env
 	var output, stdout, stderr, nsecFile io.WriteCloser
@@ -369,7 +391,7 @@ func run(env []string, stage, buildDir, workDir, command string, args ...string)
 	}
 
 	if err = cmd.Run(); err != nil {
-		return fmt.Errorf("running command: %s", err)
+		return fmt.Errorf("workdir %s, command %s: %s", workDir, strings.Join(args, " "), err)
 	}
 	if err = output.Close(); err != nil {
 		return err
@@ -536,8 +558,7 @@ func (Ding) RemoveRepo(repoName string) {
 	err := os.RemoveAll(fmt.Sprintf("config/%s", repoName))
 	sherpaCheck(err, "removing config directory")
 
-	err = os.RemoveAll(fmt.Sprintf("build/%s", repoName))
-	sherpaCheck(err, "removing build directory")
+	_removeDir("build/" + repoName)
 
 	err = os.RemoveAll(fmt.Sprintf("release/%s", repoName))
 	sherpaCheck(err, "removing release directory")
@@ -666,12 +687,29 @@ func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 	_, err := tx.Exec(`delete from result where build_id=$1`, buildId)
 	sherpaCheck(err, "removing results from database")
 
-	q := `delete from build where id=$1 returning id`
-	checkParseRow(tx.QueryRow(q, buildId), &buildId, "removing build from database")
+	builddirRemoved := false
+	q := `delete from build where id=$1 returning builddir_removed`
+	checkParseRow(tx.QueryRow(q, buildId), &builddirRemoved, "removing build from database")
 
-	buildDir := fmt.Sprintf("build/%s/%d", repoName, buildId)
-	err = os.RemoveAll(buildDir)
-	sherpaCheck(err, "removing build directory")
+	if !builddirRemoved {
+		buildDir := fmt.Sprintf("build/%s/%d", repoName, buildId)
+		_removeDir(buildDir)
+	}
+}
+
+func _removeDir(path string) {
+	if config.SudoBuild {
+		user, err := user.Current()
+		sherpaCheck(err, "getting current uid/gid")
+		cmd := exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", user.Uid, user.Gid), path)
+		buf, err := cmd.CombinedOutput()
+		if err != nil {
+			serverError(fmt.Sprintf("changing user/group ownership of %s: %s: %s", path, err, strings.TrimSpace(string(buf))))
+		}
+	}
+
+	err := os.RemoveAll(path)
+	sherpaCheck(err, "removing files")
 }
 
 // Clean up (remove) the build dir.  This does not remove the build itself from the database.
@@ -694,8 +732,7 @@ func _removeBuilddir(tx *sql.Tx, repoName string, buildId int) {
 	sherpaCheck(err, "marking builddir as removed in database")
 
 	buildDir := fmt.Sprintf("build/%s/%d", repoName, buildId)
-	err = os.RemoveAll(buildDir)
-	sherpaCheck(err, "removing build directory")
+	_removeDir(buildDir)
 }
 
 func _cleanupBuilds(repoName, branch string) {

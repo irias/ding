@@ -37,8 +37,11 @@ var (
 			Name  string
 			Email string
 		}
-		BaseURL string
-		Mail    struct {
+		BaseURL     string
+		SudoBuild   bool   // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
+		SudoUidBase int    // we'll use this + buildId as the unix uid to run the commands under
+		SudoGroup   string // the unix group to run commands as.
+		Mail        struct {
 			Enabled,
 			SmtpTls bool
 			SmtpPort int
@@ -80,6 +83,10 @@ func sherpaCheck(err error, msg string) {
 	} else {
 		m = "An error occurred. Please try again later or contact us."
 	}
+	serverError(m)
+}
+
+func serverError(m string) {
 	panic(&sherpa.Error{Code: "serverError", Message: m})
 }
 
@@ -102,6 +109,10 @@ func sherpaUserCheck(err error, msg string) {
 	} else {
 		m = "An error occurred. Please try again later or contact us."
 	}
+	userError(m)
+}
+
+func userError(m string) {
 	panic(&sherpa.Error{Code: "userError", Message: m})
 }
 
