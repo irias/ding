@@ -1,72 +1,84 @@
 <div class="row">
 	<div class="col-xs-12 col-lg-6">
-		<h2>Release</h2>
-		<table class="table">
-			<tr>
-				<td>Build</td>
-				<td>{{ build.id }}</td>
-			</tr>
-			<tr>
-				<td>Branch</td>
-				<td>{{ build.branch }}</td>
-			</tr>
-			<tr>
-				<td>Commit</td>
-				<td>{{ build.commit_hash }}</td>
-			</tr>
-			<tr>
-				<td>Build time</td>
-				<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
-			</tr>
-			<tr>
-				<td>Build size</td>
-				<td><filesize size="build.disk_usage"></filesize></td>
-			</tr>
-		</table>
-
-		<h2>Released files</h2>
-		<table class="table">
-			<thead>
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<div class="panel-title">
+					Release
+				</div>
+			</div>
+			<table class="table">
 				<tr>
-					<th>Command</th>
-					<th>Version</th>
-					<th>Os</th>
-					<th>Arch</th>
-					<th>Toolchain</th>
-					<th>Link</th>
-					<th>Size</th>
+					<td>Build</td>
+					<td>{{ build.id }}</td>
 				</tr>
-			</thead>
-			<tbody>
-				<tr ng-if="build.results.length === 0">
-					<td colspan="7">No results</td>
+				<tr>
+					<td>Branch</td>
+					<td>{{ build.branch }}</td>
 				</tr>
-				<tr ng-repeat="result in build.results">
-					<td>{{ result.command }}</td>
-					<td>{{ result.version }}</td>
-					<td>{{ result.os }}</td>
-					<td>{{ result.arch }}</td>
-					<td>{{ result.toolchain }}</td>
-					<td><a ng-href="/release/{{ repo.name }}/{{ build.id }}/{{ result.filename | basename }}">{{ result.filename | basename }}</a></td>
-					<td><filesize size="result.filesize"></filesize></td>
+				<tr>
+					<td>Commit</td>
+					<td>{{ build.commit_hash }}</td>
 				</tr>
-			</tbody>
-		</table>
+				<tr>
+					<td>Build time</td>
+					<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
+				</tr>
+				<tr>
+					<td>Build size</td>
+					<td><filesize size="build.disk_usage"></filesize></td>
+				</tr>
+			</table>
+		</div>
+
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<div class="panel-title">
+					Released files
+				</div>
+			</div>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Command</th>
+						<th>Version</th>
+						<th>Os</th>
+						<th>Arch</th>
+						<th>Toolchain</th>
+						<th>Link</th>
+						<th>Size</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr ng-if="build.results.length === 0">
+						<td colspan="7">No results</td>
+					</tr>
+					<tr ng-repeat="result in build.results">
+						<td>{{ result.command }}</td>
+						<td>{{ result.version }}</td>
+						<td>{{ result.os }}</td>
+						<td>{{ result.arch }}</td>
+						<td>{{ result.toolchain }}</td>
+						<td><a ng-href="/release/{{ repo.name }}/{{ build.id }}/{{ result.filename | basename }}">{{ result.filename | basename }}</a></td>
+						<td><filesize size="result.filesize"></filesize></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
 	</div>
 
 	<div class="col-xs-12 col-lg-6">
-		<h2>Steps</h2>
+		<h3>Steps</h3>
 		<div ng-repeat="step in steps">
-			<h3>{{ step.name }}<span ng-if="step.name !== 'success'"> (<timespent nsec="step.nsec"></timespent>)</span></h3>
+			<h4>{{ step.name }}<span ng-if="step.name !== 'success'"> (<timespent nsec="step.nsec"></timespent>)</span></h4>
 			<pre style="white-space: pre-wrap">{{ step.output }}</pre>
 		</div>
 
-		<h2>Config</h2>
-		<h3>build.sh</h3>
+		<h3>Config</h3>
+		<h4>build.sh</h4>
 		<pre style="white-space: pre-wrap">{{ build_config.build_script }}</pre>
-		<h3>test.sh</h3>
+		<h4>test.sh</h4>
 		<pre style="white-space: pre-wrap">{{ build_config.test_script }}</pre>
-		<h3>release.sh</h3>
+		<h4>release.sh</h4>
 		<pre style="white-space: pre-wrap">{{ build_config.release_script }}</pre>
 	</div>
 </div>
