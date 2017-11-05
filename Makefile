@@ -1,5 +1,5 @@
 run: build0
-	./ding local/config.json
+	./ding serve local/config.json
 
 build0:
 	python www-src/build.py

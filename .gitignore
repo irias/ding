@@ -12,3 +12,4 @@
 .hg/
 *.swp
 *.pyc
+/runas
