@@ -39,6 +39,20 @@ type Ding struct {
 func (Ding) Status() {
 }
 
+func _repo(tx *sql.Tx, repoName string) Repo {
+	q := `select row_to_json(repo.*) from repo where name=$1`
+	var r Repo
+	checkParseRow(tx.QueryRow(q, repoName), &r, "fetching repo")
+	return r
+}
+
+func _build(tx *sql.Tx, repoName string, id int) (b Build) {
+	q := `select row_to_json(bwr.*) from build_with_result bwr where id = $1`
+	checkParseRow(tx.QueryRow(q, id), &b, "fetching build")
+	fillBuild(repoName, &b)
+	return
+}
+
 func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string) {
 	workdir, err := os.Getwd()
 	sherpaCheck(err, "getting current work dir")
@@ -650,6 +664,7 @@ func _buildResult(repoName string, build Build) (br BuildResult) {
 	return
 }
 
+// Get build result.
 func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
 	var build Build
 	transact(func(tx *sql.Tx) {
