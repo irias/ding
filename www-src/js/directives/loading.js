@@ -11,6 +11,10 @@ app.directive('loadingClick', function($rootScope, Msg) {
 				e.preventDefault();
 				e.stopPropagation();
 
+				if (element.attr('disabled')) {
+					return;
+				}
+
 				scope.$apply(function() {
 					$rootScope.loading = true;
 				});
@@ -35,6 +39,10 @@ app.directive('loadingClick', function($rootScope, Msg) {
 			element.on('click', function(e) {
 				e.preventDefault();
 				e.stopPropagation();
+
+				if (element.attr('disabled')) {
+					return;
+				}
 
 				scope.$apply(function() {
 					$rootScope.loading = true;
@@ -61,6 +69,10 @@ app.directive('loadingClick', function($rootScope, Msg) {
 				e.preventDefault();
 				e.stopPropagation();
 
+				if (element.attr('disabled')) {
+					return;
+				}
+
 				scope.$apply(function() {
 					$rootScope.loading = true;
 				});
@@ -85,6 +97,10 @@ app.directive('loadingClick', function($rootScope, Msg) {
 			element.on('submit', function(e) {
 				e.preventDefault();
 				e.stopPropagation();
+
+				if (element.attr('disabled')) {
+					return;
+				}
 
 				scope.$apply(function() {
 					$rootScope.loading = true;

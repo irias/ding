@@ -119,14 +119,14 @@
 									</ul>
 								</div>
 								<div class="btn-group" uib-dropdown>
-									<button btn="danger sm" icon="trash" loading-click="cleanupBuilddir(build)" ng-disabled="build.builddir_removed">Cleanup</button>
+									<button btn="danger sm" icon="trash" loading-click="cleanupBuilddir(build)" ng-disabled="build.builddir_removed || !build.finish">Cleanup</button>
 									<button type="button" btn="danger sm" uib-dropdown-toggle>
 										<span class="caret"></span>
 										<span class="sr-only">split button</span>
 									</button>
 									<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
 										<li role="menuitem">
-											<a icon="trash" loading-click="removeBuild(build)">Delete build</a>
+											<a icon="trash" loading-click="removeBuild(build)" link-disabled="build.released || !build.finish">Delete build</a>
 										</li>
 									</ul>
 								</div>
