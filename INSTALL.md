@@ -28,7 +28,7 @@ You'll need an empty postgres database, and a config.json file like:
 			"runas": [
 				"/home/ding/runas"
 			],
-			"buildsDir": "/home/ding/build"
+			"buildsDir": "/home/ding/data/build"
 		},
 		"mail": {
 			"enabled": false,

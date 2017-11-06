@@ -186,7 +186,7 @@ func serveRelease(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, fmt.Sprintf("release/%s/%s/%s", t[1], t[2], t[3]))
+	http.ServeFile(w, r, fmt.Sprintf("data/release/%s/%s/%s", t[1], t[2], t[3]))
 }
 
 func serveResult(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +233,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.HasSuffix(name, "/"+basename) {
-			path := fmt.Sprintf("build/%s/%d/checkout/%s/%s", repoName, buildId, repoName, name)
+			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoName, name)
 			http.ServeFile(w, r, path)
 			return
 		}

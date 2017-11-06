@@ -5,9 +5,7 @@
 /ding
 /node_modules/
 
-/config/
-/build/
-/release/
+/data/
 
 .hg/
 *.swp

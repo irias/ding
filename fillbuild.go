@@ -10,7 +10,7 @@ import (
 func fillBuild(repoName string, b *Build) {
 	// add disk usage
 	b.DiskUsage = 0
-	buildDir := fmt.Sprintf("build/%s/%d", repoName, b.Id)
+	buildDir := fmt.Sprintf("data/build/%s/%d", repoName, b.Id)
 	filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
 		if err == nil {
 			const overhead = 2 * 1024
@@ -22,7 +22,7 @@ func fillBuild(repoName string, b *Build) {
 	if b.Finish == nil || b.Status == "success" {
 		return
 	}
-	path := fmt.Sprintf("build/%s/%d/output/%s.output", repoName, b.Id, b.Status)
+	path := fmt.Sprintf("data/build/%s/%d/output/%s.output", repoName, b.Id, b.Status)
 	f, err := os.Open(path)
 	if err != nil {
 		b.LastLine = fmt.Sprintf("(open for last line: %s)", err)

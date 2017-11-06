@@ -62,7 +62,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		q := `insert into build (repo_id, branch, commit_hash, status, start) values ($1, $2, $3, $4, NOW()) returning id`
 		checkParseRow(tx.QueryRow(q, repo.Id, branch, commit, "new"), &build.Id, "inserting new build into database")
 
-		buildDir = fmt.Sprintf("%s/build/%s/%d", workdir, repo.Name, build.Id)
+		buildDir = fmt.Sprintf("%s/data/build/%s/%d", workdir, repo.Name, build.Id)
 		err := os.MkdirAll(buildDir, 0777)
 		sherpaCheck(err, "creating build dir")
 
@@ -73,7 +73,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 
 		scriptsDir := buildDir + "/scripts/"
 		for _, script := range []string{"build.sh", "test.sh", "release.sh"} {
-			_copyScript(fmt.Sprintf("config/%s/%s", repo.Name, script), scriptsDir+script)
+			_copyScript(fmt.Sprintf("data/config/%s/%s", repo.Name, script), scriptsDir+script)
 		}
 
 		outputDir := buildDir + "/output"
@@ -461,9 +461,9 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 		var filenames []string
 		q := `select coalesce(json_agg(result.filename), '[]') from result where build_id=$1`
 		checkParseRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
-		checkoutDir := fmt.Sprintf("build/%s/%d/checkout/%s", repoName, build.Id, repoName)
+		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repoName, build.Id, repoName)
 		for _, filename := range filenames {
-			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
+			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
 		}
 	})
 	return
@@ -537,7 +537,7 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 		checkParseRow(tx.QueryRow(q, repo.Name, repo.Origin), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
 
-		configDir := fmt.Sprintf("config/%s/", repo.Name)
+		configDir := fmt.Sprintf("data/config/%s/", repo.Name)
 		err := os.MkdirAll(configDir, 0777)
 		sherpaCheck(err, "creating config dir for new repository")
 		writeFile(configDir+"build.sh", "")
@@ -553,7 +553,7 @@ func (Ding) SaveRepo(repo Repo, repoConfig RepoConfig) (r Repo, rc RepoConfig) {
 		q := `update repo set name=$1, origin=$2 where id=$3 returning id`
 		checkParseRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.Id), &repo.Id, "updating repo in database")
 
-		configDir := fmt.Sprintf("config/%s/", repo.Name)
+		configDir := fmt.Sprintf("data/config/%s/", repo.Name)
 		writeFile(configDir+"build.sh", repoConfig.BuildScript)
 		writeFile(configDir+"test.sh", repoConfig.TestScript)
 		writeFile(configDir+"release.sh", repoConfig.ReleaseScript)
@@ -576,14 +576,14 @@ func (Ding) RemoveRepo(repoName string) {
 		var id int
 		checkParseRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
 	})
-	err := os.RemoveAll(fmt.Sprintf("config/%s", repoName))
+	err := os.RemoveAll(fmt.Sprintf("data/config/%s", repoName))
 	sherpaCheck(err, "removing config directory")
 
 	workdir, err := os.Getwd()
 	sherpaCheck(err, "getting current work dir")
-	_removeDir(workdir + "/build/" + repoName)
+	_removeDir(workdir + "/data/build/" + repoName)
 
-	err = os.RemoveAll(fmt.Sprintf("release/%s", repoName))
+	err = os.RemoveAll(fmt.Sprintf("data/release/%s", repoName))
 	sherpaCheck(err, "removing release directory")
 }
 
@@ -622,9 +622,9 @@ func parseInt(s string) int64 {
 }
 
 func _repoConfig(repoName string) (rc RepoConfig) {
-	rc.BuildScript = readFile(fmt.Sprintf("config/%s/build.sh", repoName))
-	rc.TestScript = readFile(fmt.Sprintf("config/%s/test.sh", repoName))
-	rc.ReleaseScript = readFile(fmt.Sprintf("config/%s/release.sh", repoName))
+	rc.BuildScript = readFile(fmt.Sprintf("data/config/%s/build.sh", repoName))
+	rc.TestScript = readFile(fmt.Sprintf("data/config/%s/test.sh", repoName))
+	rc.ReleaseScript = readFile(fmt.Sprintf("data/config/%s/release.sh", repoName))
 	return
 }
 
@@ -637,7 +637,7 @@ func (Ding) RepoConfig(repoName string) (rc RepoConfig) {
 }
 
 func _buildResult(repoName string, build Build) (br BuildResult) {
-	buildDir := fmt.Sprintf("build/%s/%d/", repoName, build.Id)
+	buildDir := fmt.Sprintf("data/build/%s/%d/", repoName, build.Id)
 	br.BuildConfig.BuildScript = readFile(buildDir + "scripts/build.sh")
 	br.BuildConfig.TestScript = readFile(buildDir + "scripts/test.sh")
 	br.BuildConfig.ReleaseScript = readFile(buildDir + "scripts/release.sh")
@@ -718,7 +718,7 @@ func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 	if !builddirRemoved {
 		workdir, err := os.Getwd()
 		sherpaCheck(err, "getting current work dir")
-		buildDir := fmt.Sprintf("%s/build/%s/%d", workdir, repoName, buildId)
+		buildDir := fmt.Sprintf("%s/data/build/%s/%d", workdir, repoName, buildId)
 		_removeDir(buildDir)
 	}
 }
@@ -760,7 +760,7 @@ func _removeBuilddir(tx *sql.Tx, repoName string, buildId int) {
 
 	workdir, err := os.Getwd()
 	sherpaCheck(err, "getting current work dir")
-	buildDir := fmt.Sprintf("%s/build/%s/%d", workdir, repoName, buildId)
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", workdir, repoName, buildId)
 	_removeDir(buildDir)
 }
 
