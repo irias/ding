@@ -1,0 +1,34 @@
+<div class="row">
+	<div class="col-xs-12 col-md-10 col-md-offset-1 col-lg-8 col-lg-offset-2">
+		<h2>Ding</h2>
+		<p>Ding builds your software project, producing programs you can then download (and run/deploy, through other mechanisms outside of ding).</p>
+		<p>The following concepts play a role in ding:</p>
+		<ul>
+			<li>Repositories</li>
+			<li>Builds</li>
+			<li>Results</li>
+			<li>Releases</li>
+		</ul>
+
+		<h3>Repositories</h3>
+		<p>Ding assumes a software project is in a version control system. Ding currently only supports git. On each build, ding clones the git repository. Per ding repository, you need to configure three shell scripts: build.sh, test.sh and release.sh. The first must compile the software. The second runs tests. The third creates releasable results. The separate "steps" only exist so you can more easily find out in which step a build broke.</p>
+		<p>A repository exists so you can create execute builds.</p>
+
+		<h3>Builds</h3>
+		<p>A build is an attempt to compile the software and create releasable results. A build can be in progress, failed or successful. Additionally, successful builds can be released. Builds are automatically cleaned up to reclaim disk space. Only the last build per branch and released builds are never deleted. Unreleased builds can also have just their build directory removed to reclaim space. Those builds exist in the database, but cannot be opened to see details.</p>
+		<p>The goal of a build is to create results.</p>
+
+		<h3>Results</h3>
+		<p>Results are just files that can be released. For java projects, they are typically jar files. For go projects, they are typically binary files, one for each architecture you compiled for. The output of your release.sh scripts points to the files that are results. Results only exist in the build directory and are removed when the build is removed.</p>
+		<p>But you can also release results.</p>
+
+		<h3>Releases</h3>
+		<p>Releases are builds of which the results have been saved away. The build directory can then be cleaned, but the resulting files will remain available.</p>
+
+		<h2>What ding is not</h2>
+		<p>Ding does not deploy your software.</p>
+
+		<h2>More</h2>
+		<p>Ding has an API at <a href="/ding/">/ding/</a>.</p>
+	</div>
+</div>

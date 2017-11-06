@@ -21,10 +21,7 @@
 		<div class="loadingsaved x-loadingsaved" style="display:none">
 			<i class="fa fa-check"></i> Opgeslagen ☺</i>
 		</div>
-		<div class="topbar" role="navigation">
-			<a href="#/"class="logo">
-				<img src="static/img/logo.png?v=REV" class="logo-img" />
-			</a>
+		<div class="topbar" role="navigation" style="padding: 0 15px">
 			<div ng-if="breadcrumbs" class="breadcrumbs">
 				<span class="crumb">
 					<a ng-href="#/" icon="home"></a>
@@ -34,7 +31,8 @@
 					<span ng-if="$last" ng-bind="bc.label"></span>
 				</span>
 			</div>
-			<div class="topright-buttons">
+			<div style="float: right; line-height: 40px">
+				<a href="#/help/">Help</a>
 			</div>
 			<div style="clear:both"></div>
 		</div>

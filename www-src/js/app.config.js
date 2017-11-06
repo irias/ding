@@ -59,6 +59,14 @@ app.config(function($routeProvider, $uibTooltipProvider) {
 			}
 		}
 	})
+	.when('/help/', {
+		templateUrl: 'static/html/help.html',
+		controller: function($rootScope, Util) {
+			$rootScope.breadcrumbs = Util.crumbs([
+				Util.crumb('/help/', 'Help')
+			]);
+		}
+	})
 	.otherwise({
 		templateUrl: 'static/html/404.html'
 	});
