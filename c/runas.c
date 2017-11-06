@@ -9,6 +9,7 @@
 
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/param.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -92,6 +93,9 @@ main(int argc, char *argv[]) {
 	}
 	if(setgid(gid) != 0) {
 		err(1, "setgid");
+	}
+	if(setgroups(1, &gid) != 0) {
+		err(1, "setgroups");
 	}
 	if(setuid(uid) != 0) {
 		err(1, "setuid");
