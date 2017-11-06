@@ -1,10 +1,16 @@
 /*
- * simple tool to run a command as another user, intended to be installed setuid root, executable by the gid that is allowed to start builds. E.g. to run as uid 10123, gid 1038, with environment left intact:
- *
- *      /path/to/runas 10123 1038 ./build.sh
- *
- * The minimum uid is read from /etc/runas.conf, which must contain just a single number.
- * Any gid except 0 is allowed.
+Simple tool to run a command as another user, intended to be installed setuid root, executable by the gid that is allowed to start builds. E.g. to run as uid 10123, gid 1038, with environment left intact:
+
+	/path/to/runas 10123 1038 ./build.sh
+
+The minimum uid is read from /etc/runas.conf, which must contain just a single number.
+Any gid except 0 is allowed.
+
+Compile:
+
+	cc -Wall -DWITH_SETRESUID -o runas runas.c  # for openbsd
+	cc -Wall -DWITH_SETRESUID -D_GNU_SOURCE -o runas runas.c  # for linux
+	cc -Wall -o runas runas.c  # for macos
  */
 
 #include <sys/types.h>
@@ -16,6 +22,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <string.h>
+#include <grp.h>
 
 typedef unsigned int uint;
 
@@ -91,15 +98,59 @@ main(int argc, char *argv[]) {
 	if(gid == 0) {
 		errx(1, "gid 0 is not allowed");
 	}
-	if(setgid(gid) != 0) {
-		err(1, "setgid");
+
+#ifdef WITH_SETRESUID
+	if(setresgid(gid, gid, gid) != 0) {
+		err(1, "setresgid");
 	}
+	uid_t rgid, egid, sgid;
+	if(getresgid(&rgid, &egid, &sgid) != 0) {
+		err(1, "getresgid");
+	}
+	if(rgid != gid || egid != gid || sgid != gid) {
+		errx(1, "not all gids were correct after setresgid");
+	}
+
 	if(setgroups(1, &gid) != 0) {
 		err(1, "setgroups");
 	}
-	if(setuid(uid) != 0) {
-		err(1, "setuid");
+
+	if(setresuid(uid, uid, uid) != 0) {
+		err(1, "setresuid");
 	}
+	uid_t ruid, euid, suid;
+	if(getresuid(&ruid, &euid, &suid) != 0) {
+		err(1, "getresuid");
+	}
+	if(ruid != uid || euid != uid || suid != uid) {
+		errx(1, "not all uids were correct after setresuid");
+	}
+#else
+	if(geteuid() != 0) {
+		err(1, "must be called with effective uid 0");
+	}
+
+	if (setregid(gid, gid) != 0) {
+		err(1, "setregid");
+	}
+	if(getgid() != gid || getegid() != gid) {
+		err(1, "real or effective gid not as expected");
+	}
+	// if only there was a way to check sgid...
+
+	if(setgroups(1, &gid) != 0) {
+		err(1, "setgroups");
+	}
+
+	if(setreuid(uid, uid) != 0) {
+		err(1, "setreuid");
+	}
+	if(getuid() != uid || geteuid() != uid) {
+		errx(1, "real or effective uid not as expected");
+	}
+	/// if only there was a way to check suid...
+#endif
+
 	execvp(argv[3], argv+3);
 	err(1, "execvp");
 }
