@@ -135,6 +135,15 @@ func serve(args []string) {
 	http.HandleFunc("/release/", serveRelease)
 	http.HandleFunc("/result/", serveResult)
 
+	unfinishedMsg := "marked as failed/unfinished at ding startup."
+	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null`, unfinishedMsg)
+	check(err, "marking unfinished builds as failed")
+	rows, err := result.RowsAffected()
+	check(err, "reading affected rows for marking unfinished builds as failed")
+	if rows > 0 {
+		log.Printf("marked %d unfinished builds as failed\n", rows)
+	}
+
 	log.Printf("version %s, listening on %s\n", version, *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
