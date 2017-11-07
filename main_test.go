@@ -38,7 +38,8 @@ func TestMain(m *testing.M) {
 	_, err = tx.Exec("drop schema if exists public cascade; create schema public")
 	check(err, "recreating public schema")
 
-	runScripts(tx, -1, scripts)
+	committing := true
+	runScripts(tx, -1, scripts, committing)
 
 	err = tx.Commit()
 	check(err, "committing initialized database")
