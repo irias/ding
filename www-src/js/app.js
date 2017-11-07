@@ -34,7 +34,6 @@ var app = angular.module('app', [
 			txt = JSON.stringify(error);
 		}
 		Msg.alert('Error loading page: ' + txt);
-		$window.history.back();
 	};
 
 	$rootScope.$on('$routeChangeStart', function(event, next) {
