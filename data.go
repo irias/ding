@@ -5,15 +5,10 @@ import (
 )
 
 type Repo struct {
-	Id     int    `json:"id"`
-	Name   string `json:"name"`
-	Origin string `json:"origin"`
-}
-
-type RepoConfig struct {
-	BuildScript   string `json:"build_script"`
-	TestScript    string `json:"test_script"`
-	ReleaseScript string `json:"release_script"`
+	Id          int    `json:"id"`
+	Name        string `json:"name"`
+	Origin      string `json:"origin"`
+	BuildScript string `json:"build_script"`
 }
 
 type RepoBuilds struct {
@@ -57,7 +52,7 @@ type Step struct {
 }
 
 type BuildResult struct {
-	Build       Build      `json:"build"`
-	BuildConfig RepoConfig `json:"build_config"`
-	Steps       []Step     `json:"steps"`
+	Build       Build  `json:"build"`
+	BuildScript string `json:"build_script"`
+	Steps       []Step `json:"steps"`
 }

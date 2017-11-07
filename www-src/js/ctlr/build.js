@@ -10,8 +10,8 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 	]);
 
 	$scope.repo = repo;
+	$scope.buildResult = buildResult;
 	$scope.build = buildResult.build;
-	$scope.build_config = buildResult.build_config;
 	$scope.steps = buildResult.steps;
 
 	$scope.removeBuild = function() {

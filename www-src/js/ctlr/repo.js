@@ -3,14 +3,13 @@
 /* global app, api, _ */
 'use strict';
 
-app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, repo, repo_config, builds) {
+app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, repo, builds) {
 	$rootScope.breadcrumbs = Util.crumbs([
 		Util.crumb('repo/' + repo.name, 'Repo ' + repo.name)
 	]);
 
 
 	$scope.repo = repo;
-	$scope.repo_config = repo_config;
 	$scope.builds = builds;
 	$scope.releaseBuilds = _.filter($scope.builds, function(b) { return b.released; });
 
@@ -24,7 +23,7 @@ app.controller('Repo', function($scope, $rootScope, $q, $location, Msg, Util, re
 	};
 
 	$scope.save = function() {
-		return api.saveRepo($scope.repo, $scope.repo_config);
+		return api.saveRepo($scope.repo);
 	};
 
 	$scope.removeBuild = function(build) {

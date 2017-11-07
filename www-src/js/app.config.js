@@ -27,9 +27,6 @@ app.config(function($routeProvider, $uibTooltipProvider) {
 			repo: function($route) {
 				return api.repo($route.current.params.repoName);
 			},
-			repo_config: function($route) {
-				return api.repoConfig($route.current.params.repoName);
-			},
 			builds: function($route) {
 				return api.builds($route.current.params.repoName);
 			}

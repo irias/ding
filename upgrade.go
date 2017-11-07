@@ -28,7 +28,7 @@ func parseSQLScripts() (scripts []Script) {
 	return scripts
 }
 
-func runScripts(tx *sql.Tx, dbVersion int, scripts []Script) {
+func runScripts(tx *sql.Tx, dbVersion int, scripts []Script, committing bool) {
 	for _, script := range scripts {
 		if script.Version <= dbVersion {
 			continue
@@ -41,6 +41,38 @@ func runScripts(tx *sql.Tx, dbVersion int, scripts []Script) {
 		check(err, "fetching database schema version after upgrade")
 		if version != script.Version {
 			log.Fatalf("invalid upgrade script %s: database not at version %d after running, but at %d\n", script.Filename, script.Version, version)
+		}
+
+		switch script.Version {
+		case 5:
+			var repoNames []string
+			checkRow(tx.QueryRow(`select coalesce(json_agg(name), '[]') from repo`), &repoNames, "reading repos from database")
+			for _, repoName := range repoNames {
+				dir := "data/config/" + repoName
+				buildSh := readFile(dir + "/build.sh")
+				testSh := readFileLax(dir + "/test.sh")
+				releaseSh := readFileLax(dir + "/release.sh")
+				buildSh += "\n\necho step:test\n" + testSh
+				buildSh += "\n\necho step:release\n" + releaseSh
+				var id int
+				err = tx.QueryRow(`update repo set build_script=$1 where name=$2 returning id`, buildSh, repoName).Scan(&id)
+				if err != nil {
+					log.Printf("setting repo.build_script for repo %s: %s\n", repoName, err)
+				}
+
+				remove := func(path string) {
+					err := os.Remove(path)
+					if err != nil {
+						log.Printf("cleaning up shell script %s: %s", path, err)
+					}
+				}
+				if !committing {
+					log.Fatal("aborting upgrade, cannot rollback changes to disk")
+				}
+				remove(dir + "/build.sh")
+				remove(dir + "/test.sh")
+				remove(dir + "/release.sh")
+			}
 		}
 	}
 	return
@@ -99,9 +131,10 @@ func upgrade(args []string) {
 		dbVersion = -1
 	}
 
-	runScripts(tx, dbVersion, scripts)
+	committing := len(args) == 2
+	runScripts(tx, dbVersion, scripts, committing)
 
-	if len(args) == 2 {
+	if committing {
 		check(tx.Commit(), "committing")
 		_, err = fmt.Printf("upgrade to version %d committed\n", lastScript.Version)
 		check(err, "write")

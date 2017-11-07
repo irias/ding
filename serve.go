@@ -75,7 +75,7 @@ func userError(m string) {
 	panic(&sherpa.Error{Code: "userError", Message: m})
 }
 
-func checkParseRow(row *sql.Row, r interface{}, msg string) {
+func sherpaCheckRow(row *sql.Row, r interface{}, msg string) {
 	var buf []byte
 	err := row.Scan(&buf)
 	if err == sql.ErrNoRows {
@@ -83,6 +83,16 @@ func checkParseRow(row *sql.Row, r interface{}, msg string) {
 	}
 	sherpaCheck(err, msg+": reading json from database row into buffer")
 	sherpaCheck(json.Unmarshal(buf, r), msg+": parsing json from database")
+}
+
+func checkRow(row *sql.Row, r interface{}, msg string) {
+	var buf []byte
+	err := row.Scan(&buf)
+	if err == sql.ErrNoRows {
+		log.Fatal("no row in result")
+	}
+	check(err, msg+": reading json from database row into buffer")
+	check(json.Unmarshal(buf, r), msg+": parsing json from database")
 }
 
 type job struct {

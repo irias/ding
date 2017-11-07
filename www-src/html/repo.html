@@ -20,12 +20,12 @@
 
 <div class="row">
 	<div class="col-xs-12 col-lg-6">
-		<form saving-submit="save()">
-			<div class="panel panel-default">
-				<div class="panel-heading">
-					<div class="panel-title">Repository</div>
-				</div>
-				<div class="panel-body">
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<div class="panel-title">Repository</div>
+			</div>
+			<div class="panel-body">
+				<form saving-submit="save()">
 					<div class="form-group">
 						<label>Name</label>
 						<input type="text" ng-model="repo.name" class="form-control" required placeholder="Name..." disabled />
@@ -36,38 +36,43 @@
 						<input type="text" ng-model="repo.origin" class="form-control" required placeholder="git.example.com:repo.git" />
 					</div>
 
-					<div class="bs-callout bs-callout-info">
-						The scripts below are run in a relatively clean environment. The following environment variables are set:
-						<ul>
-							<li>$HOME, an empty directory</li>
-							<li>$BUILDID, the build number, should be used in the resulting file names</li>
-						</ul>
-						The scripts are run in the checkout directory. They should exit with status 0 only when successful.
-					</div>
 
 					<div class="form-group">
 						<label>build.sh</label>
-						<textarea class="form-control" ng-model="repo_config.build_script" rows="10" placeholder="shell script for to compile"></textarea>
+						<textarea class="form-control" ng-model="repo.build_script" rows="10" placeholder="#!/bin/sh
+exec make release"></textarea>
 					</div>
 
-					<div class="form-group">
-						<label>test.sh</label>
-						<textarea class="form-control" ng-model="repo_config.test_script" rows="10" placeholder="shell script for to run tests"></textarea>
-					</div>
-
-					<div class="form-group">
-						<label>release.sh</label>
-						<textarea class="form-control" ng-model="repo_config.release_script" rows="10" placeholder="shell script for to create releaseable files"></textarea>
-						<div class="bs-callout bs-callout-info">
-							The standard output of the release script is parsed. Lines that match this format are treated as released files: <tt>"release:" command version os arch toolchain path</tt>. Where "release:" is just the literal string <tt>release</tt>. Command is the name of the command, as you would type it in a terminal. Version is a semver version, x.y.z. Os must be one of: any, linux, darwin, openbsd, windows; the OS this program can run on, any is for platform-independent tools like a jar. Arch must be one of: any, amd64, arm64; similar to OS. Toolchain should describe the compiler and possibly other tools that are used to build this release. Path is the local path (either absolute or relative to the checkout directory) of the released file.
-						</div>
-					</div>
-				</div>
-				<div class="panel-footer">
 					<button type="submit" class="btn btn-primary" icon="save">Save</button>
-				</div>
+				</form>
+
 			</div>
-		</form>
+		</div>
+
+		<div class="bs-callout bs-callout-info">
+			<p>Build.sh is run in a relatively clean environment, in the checkout directory. The following environment variables are set:</p>
+			<ul>
+				<li>$HOME, an empty directory</li>
+				<li>$BUILDID, the build number, should be used in the resulting file names</li>
+				<li>$REPONAME, the build number, should be used in the resulting file names</li>
+				<li>$BRANCH, the branch of the build, empty if not yet known</li>
+				<li>$COMMITHASH, the commithash, empty if not yet known</li>
+				<li>any key/value pair from the config "environment" object</li>
+			</ul>
+			<p>It should exit with status 0 only when successful.</p>
+			<p>The standard output of the release script is parsed. Lines that match this format are treated as released files:</p>
+			<blockquote><tt>"release:" command version os arch toolchain path</tt></blockquote>
+			<p>The fields:</p>
+			<ul>
+				<li>"release:" is just the literal string <tt>release:</tt></li>
+				<li><tt>command</tt> is the name of the command, as you would type it in a terminal</li>
+				<li><tt>version</tt> is a semver version, x.y.z</li>
+				<li><tt>os</tt> must be one of: any, linux, darwin, openbsd, windows; the OS this program can run on, any is for platform-independent tools like a jar</li>
+				<li><tt>arch</tt> must be one of: any, amd64, arm64; similar to OS</li>
+				<li><tt>oolchain</tt> should describe the compiler and possibly other tools that are used to build this release</li>
+				<li><tt>path</tt> is the local path (either absolute or relative to the checkout directory) of the released file.</li>
+			</ul>
+		</div>
 	</div>
 
 	<div class="col-xs-12 col-lg-6">

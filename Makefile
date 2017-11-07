@@ -1,7 +1,7 @@
-run: build0
+run: build
 	./ding serve local/config.json
 
-build0:
+build:
 	python www-src/build.py
 	go build -i
 	sherpadoc Ding >assets/ding.json

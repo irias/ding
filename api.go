@@ -24,8 +24,6 @@ var (
 		"clone",
 		"checkout",
 		"build",
-		"test",
-		"release",
 		"success",
 	}
 )
@@ -39,16 +37,15 @@ type Ding struct {
 func (Ding) Status() {
 }
 
-func _repo(tx *sql.Tx, repoName string) Repo {
+func _repo(tx *sql.Tx, repoName string) (r Repo) {
 	q := `select row_to_json(repo.*) from repo where name=$1`
-	var r Repo
-	checkParseRow(tx.QueryRow(q, repoName), &r, "fetching repo")
-	return r
+	sherpaCheckRow(tx.QueryRow(q, repoName), &r, "fetching repo")
+	return
 }
 
 func _build(tx *sql.Tx, repoName string, id int) (b Build) {
 	q := `select row_to_json(bwr.*) from build_with_result bwr where id = $1`
-	checkParseRow(tx.QueryRow(q, id), &b, "fetching build")
+	sherpaCheckRow(tx.QueryRow(q, id), &b, "fetching build")
 	fillBuild(repoName, &b)
 	return
 }
@@ -58,7 +55,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		repo = _repo(tx, repoName)
 
 		q := `insert into build (repo_id, branch, commit_hash, status, start) values ($1, $2, $3, $4, NOW()) returning id`
-		checkParseRow(tx.QueryRow(q, repo.Id, branch, commit, "new"), &build.Id, "inserting new build into database")
+		sherpaCheckRow(tx.QueryRow(q, repo.Id, branch, commit, "new"), &build.Id, "inserting new build into database")
 
 		buildDir = fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
 		err := os.MkdirAll(buildDir, 0777)
@@ -69,10 +66,10 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		err = os.MkdirAll(buildDir+"/home", 0777)
 		sherpaCheck(err, "creating home dir")
 
-		scriptsDir := buildDir + "/scripts/"
-		for _, script := range []string{"build.sh", "test.sh", "release.sh"} {
-			_copyScript(fmt.Sprintf("data/config/%s/%s", repo.Name, script), scriptsDir+script)
-		}
+		buildSh := buildDir + "/scripts/build.sh"
+		writeFile(buildSh, repo.BuildScript)
+		err = os.Chmod(buildSh, os.FileMode(0755))
+		sherpaCheck(err, "chmod")
 
 		outputDir := buildDir + "/output"
 		err = os.MkdirAll(outputDir, 0777)
@@ -278,17 +275,9 @@ Ding
 	err = run(env, "build", buildDir, checkoutDir, runas("../../scripts/build.sh")...)
 	sherpaUserCheck(err, "building")
 
-	_updateStatus("test")
-	err = run(env, "test", buildDir, checkoutDir, runas("../../scripts/test.sh")...)
-	sherpaUserCheck(err, "running tests")
-
-	_updateStatus("release")
-	err = run(env, "release", buildDir, checkoutDir, runas("../../scripts/release.sh")...)
-	sherpaUserCheck(err, "publishing build")
-
 	transact(func(tx *sql.Tx) {
 		outputDir := buildDir + "/output"
-		results := parseResults(checkoutDir, outputDir+"/release.stdout")
+		results := parseResults(checkoutDir, outputDir+"/build.stdout")
 
 		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename, filesize) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 		for _, result := range results {
@@ -326,9 +315,9 @@ func fileCopy(src, dst string) {
 
 func parseResults(checkoutDir, path string) (results []Result) {
 	f, err := os.Open(path)
-	sherpaUserCheck(err, "opening release output")
+	sherpaUserCheck(err, "opening build output")
 	defer func() {
-		sherpaUserCheck(f.Close(), "closing release output")
+		sherpaUserCheck(f.Close(), "closing build output")
 	}()
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -353,23 +342,8 @@ func parseResults(checkoutDir, path string) (results []Result) {
 		results = append(results, result)
 	}
 	err = scanner.Err()
-	sherpaUserCheck(err, "reading release output")
+	sherpaUserCheck(err, "reading build output")
 	return
-}
-
-func _copyScript(src, dst string) {
-	in, err := os.Open(src)
-	sherpaCheck(err, "copy script: opening source script")
-	out, err := os.Create(dst)
-	sherpaCheck(err, "copy script: opening destinations script")
-	_, err = io.Copy(out, in)
-	sherpaCheck(err, "copy script: copying data")
-	err = in.Close()
-	sherpaCheck(err, "copy script: closing input")
-	err = out.Close()
-	sherpaCheck(err, "copy script: closing output")
-	err = os.Chmod(dst, os.FileMode(0755))
-	sherpaCheck(err, "copy script: chmod")
 }
 
 func run(env []string, stage, buildDir, workDir string, args ...string) (err error) {
@@ -455,11 +429,10 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 		}
 
 		br := _buildResult(repoName, build)
-		buildConfig := toJSON(br.BuildConfig)
 		steps := toJSON(br.Steps)
 
-		qrel := `insert into release (build_id, time, build_config, steps) values ($1, now(), $2::json, $3::json) returning build_id`
-		err := tx.QueryRow(qrel, build.Id, buildConfig, steps).Scan(&build.Id)
+		qrel := `insert into release (build_id, time, build_script, steps) values ($1, now(), $2, $3::json) returning build_id`
+		err := tx.QueryRow(qrel, build.Id, br.BuildScript, steps).Scan(&build.Id)
 		sherpaCheck(err, "inserting release into database")
 
 		qup := `update build set released=now() where id=$1 returning id`
@@ -468,7 +441,7 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 
 		var filenames []string
 		q := `select coalesce(json_agg(result.filename), '[]') from result where build_id=$1`
-		checkParseRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
+		sherpaCheckRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
 		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repoName, build.Id, repoName)
 		for _, filename := range filenames {
 			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
@@ -498,7 +471,7 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 			group by repo.id
 		) repobuilds
 	`
-	checkParseRow(database.QueryRow(q), &rb, "fetching repobuilds")
+	sherpaCheckRow(database.QueryRow(q), &rb, "fetching repobuilds")
 	for _, e := range rb {
 		for i, b := range e.Builds {
 			fillBuild(e.Repo.Name, &b)
@@ -518,7 +491,7 @@ func (Ding) Repo(repoName string) (repo Repo) {
 // Builds returns builds for a repo
 func (Ding) Builds(repoName string) (builds []Build) {
 	q := `select coalesce(json_agg(bwr.* order by start desc), '[]') from build_with_result bwr join repo on bwr.repo_id = repo.id where repo.name=$1`
-	checkParseRow(database.QueryRow(q, repoName), &builds, "fetching builds")
+	sherpaCheckRow(database.QueryRow(q, repoName), &builds, "fetching builds")
 	for i, b := range builds {
 		fillBuild(repoName, &b)
 		builds[i] = b
@@ -540,34 +513,20 @@ func writeFile(path, content string) {
 // Create new repository.
 func (Ding) CreateRepo(repo Repo) (r Repo) {
 	transact(func(tx *sql.Tx) {
-		q := `insert into repo (name, origin) values ($1, $2) returning id`
+		q := `insert into repo (name, origin, build_script) values ($1, $2, '') returning id`
 		var id int64
-		checkParseRow(tx.QueryRow(q, repo.Name, repo.Origin), &id, "inserting repository in database")
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
-
-		configDir := fmt.Sprintf("data/config/%s/", repo.Name)
-		err := os.MkdirAll(configDir, 0777)
-		sherpaCheck(err, "creating config dir for new repository")
-		writeFile(configDir+"build.sh", "")
-		writeFile(configDir+"test.sh", "")
-		writeFile(configDir+"release.sh", "")
 	})
 	return
 }
 
 // Save repository.
-func (Ding) SaveRepo(repo Repo, repoConfig RepoConfig) (r Repo, rc RepoConfig) {
+func (Ding) SaveRepo(repo Repo) (r Repo) {
 	transact(func(tx *sql.Tx) {
-		q := `update repo set name=$1, origin=$2 where id=$3 returning id`
-		checkParseRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.Id), &repo.Id, "updating repo in database")
-
-		configDir := fmt.Sprintf("data/config/%s/", repo.Name)
-		writeFile(configDir+"build.sh", repoConfig.BuildScript)
-		writeFile(configDir+"test.sh", repoConfig.TestScript)
-		writeFile(configDir+"release.sh", repoConfig.ReleaseScript)
-
+		q := `update repo set name=$1, origin=$2, build_script=$3 where id=$4 returning row_to_json(repo.*)`
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.BuildScript, repo.Id), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
-		rc = _repoConfig(repo.Name)
 	})
 	return
 }
@@ -582,14 +541,12 @@ func (Ding) RemoveRepo(repoName string) {
 		sherpaCheck(err, "removing builds from database")
 
 		var id int
-		checkParseRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
+		sherpaCheckRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
 	})
-	err := os.RemoveAll(fmt.Sprintf("data/config/%s", repoName))
-	sherpaCheck(err, "removing config directory")
 
 	_removeDir(dingWorkDir + "/data/build/" + repoName)
 
-	err = os.RemoveAll(fmt.Sprintf("data/release/%s", repoName))
+	err := os.RemoveAll(fmt.Sprintf("data/release/%s", repoName))
 	sherpaCheck(err, "removing release directory")
 }
 
@@ -627,26 +584,9 @@ func parseInt(s string) int64 {
 	return v
 }
 
-func _repoConfig(repoName string) (rc RepoConfig) {
-	rc.BuildScript = readFile(fmt.Sprintf("data/config/%s/build.sh", repoName))
-	rc.TestScript = readFile(fmt.Sprintf("data/config/%s/test.sh", repoName))
-	rc.ReleaseScript = readFile(fmt.Sprintf("data/config/%s/release.sh", repoName))
-	return
-}
-
-func (Ding) RepoConfig(repoName string) (rc RepoConfig) {
-	transact(func(tx *sql.Tx) {
-		_repo(tx, repoName)
-	})
-	rc = _repoConfig(repoName)
-	return
-}
-
 func _buildResult(repoName string, build Build) (br BuildResult) {
 	buildDir := fmt.Sprintf("data/build/%s/%d/", repoName, build.Id)
-	br.BuildConfig.BuildScript = readFile(buildDir + "scripts/build.sh")
-	br.BuildConfig.TestScript = readFile(buildDir + "scripts/test.sh")
-	br.BuildConfig.ReleaseScript = readFile(buildDir + "scripts/release.sh")
+	br.BuildScript = readFile(buildDir + "scripts/build.sh")
 
 	outputDir := buildDir + "output/"
 	for _, stepName := range stepNames {
@@ -687,7 +627,7 @@ func (Ding) Release(repoName string, buildId int) (br BuildResult) {
 		build := _build(tx, repoName, buildId)
 
 		q := `select row_to_json(release.*) from release where build_id=$1`
-		checkParseRow(tx.QueryRow(q, buildId), &br, "fetching release from database")
+		sherpaCheckRow(tx.QueryRow(q, buildId), &br, "fetching release from database")
 		br.Build = build
 	})
 	return
@@ -698,7 +638,7 @@ func (Ding) RemoveBuild(buildId int) {
 	var repoName string
 	transact(func(tx *sql.Tx) {
 		qrepo := `select to_json(repo.name) from build join repo on build.repo_id = repo.id where build.id = $1`
-		checkParseRow(tx.QueryRow(qrepo, buildId), &repoName, "fetching repo name from database")
+		sherpaCheckRow(tx.QueryRow(qrepo, buildId), &repoName, "fetching repo name from database")
 
 		build := _build(tx, repoName, buildId)
 		if build.Released != nil {
@@ -712,14 +652,14 @@ func (Ding) RemoveBuild(buildId int) {
 func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 	var filenames []string
 	qres := `select coalesce(json_agg(filename), '[]') from result where build_id=$1`
-	checkParseRow(tx.QueryRow(qres, buildId), &filenames, "fetching released files")
+	sherpaCheckRow(tx.QueryRow(qres, buildId), &filenames, "fetching released files")
 
 	_, err := tx.Exec(`delete from result where build_id=$1`, buildId)
 	sherpaCheck(err, "removing results from database")
 
 	builddirRemoved := false
 	q := `delete from build where id=$1 returning builddir_removed`
-	checkParseRow(tx.QueryRow(q, buildId), &builddirRemoved, "removing build from database")
+	sherpaCheckRow(tx.QueryRow(q, buildId), &builddirRemoved, "removing build from database")
 
 	if !builddirRemoved {
 		buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repoName, buildId)
@@ -776,7 +716,7 @@ func _cleanupBuilds(repoName, branch string) {
 			where repo.name=$1 and build.branch=$2
 		) x
 	`
-	checkParseRow(database.QueryRow(q, repoName, branch), &builds, "fetching builds from database")
+	sherpaCheckRow(database.QueryRow(q, repoName, branch), &builds, "fetching builds from database")
 	now := time.Now()
 	for index, b := range builds {
 		if index == 0 || b.Released != nil {
