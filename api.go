@@ -54,15 +54,13 @@ func _build(tx *sql.Tx, repoName string, id int) (b Build) {
 }
 
 func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string) {
-	workdir, err := os.Getwd()
-	sherpaCheck(err, "getting current work dir")
 	transact(func(tx *sql.Tx) {
 		repo = _repo(tx, repoName)
 
 		q := `insert into build (repo_id, branch, commit_hash, status, start) values ($1, $2, $3, $4, NOW()) returning id`
 		checkParseRow(tx.QueryRow(q, repo.Id, branch, commit, "new"), &build.Id, "inserting new build into database")
 
-		buildDir = fmt.Sprintf("%s/data/build/%s/%d", workdir, repo.Name, build.Id)
+		buildDir = fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
 		err := os.MkdirAll(buildDir, 0777)
 		sherpaCheck(err, "creating build dir")
 
@@ -99,7 +97,7 @@ func (Ding) CreateBuild(repoName, branch, commit string) Build {
 				}
 			}
 		}()
-		_doBuild(repo, build, buildDir)
+		doBuild(repo, build, buildDir)
 	}()
 	return build
 }
@@ -108,7 +106,20 @@ func calcUid(buildId int) int {
 	return config.IsolateBuilds.UidStart + buildId%(config.IsolateBuilds.UidEnd-config.IsolateBuilds.UidStart)
 }
 
-func _doBuild(repo Repo, build Build, buildDir string) Build {
+func doBuild(repo Repo, build Build, buildDir string) {
+	job := job{
+		repo.Name,
+		make(chan struct{}),
+	}
+	newJobs <- job
+	<-job.rc
+	defer func() {
+		finishedJobs <- job.repoName
+	}()
+	_doBuild(repo, build, buildDir)
+}
+
+func _doBuild(repo Repo, build Build, buildDir string) {
 	defer func() {
 		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
 		sherpaCheck(err, "marking build as finished in database")
@@ -288,10 +299,7 @@ Ding
 
 		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
 		sherpaCheck(err, "marking build as success in database")
-
-		build = _build(tx, repo.Name, build.Id)
 	})
-	return build
 }
 
 func fileCopy(src, dst string) {
@@ -579,9 +587,7 @@ func (Ding) RemoveRepo(repoName string) {
 	err := os.RemoveAll(fmt.Sprintf("data/config/%s", repoName))
 	sherpaCheck(err, "removing config directory")
 
-	workdir, err := os.Getwd()
-	sherpaCheck(err, "getting current work dir")
-	_removeDir(workdir + "/data/build/" + repoName)
+	_removeDir(dingWorkDir + "/data/build/" + repoName)
 
 	err = os.RemoveAll(fmt.Sprintf("data/release/%s", repoName))
 	sherpaCheck(err, "removing release directory")
@@ -716,9 +722,7 @@ func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 	checkParseRow(tx.QueryRow(q, buildId), &builddirRemoved, "removing build from database")
 
 	if !builddirRemoved {
-		workdir, err := os.Getwd()
-		sherpaCheck(err, "getting current work dir")
-		buildDir := fmt.Sprintf("%s/data/build/%s/%d", workdir, repoName, buildId)
+		buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repoName, buildId)
 		_removeDir(buildDir)
 	}
 }
@@ -758,9 +762,7 @@ func _removeBuilddir(tx *sql.Tx, repoName string, buildId int) {
 	err := tx.QueryRow("update build set builddir_removed=true where id=$1 returning id", buildId).Scan(&buildId)
 	sherpaCheck(err, "marking builddir as removed in database")
 
-	workdir, err := os.Getwd()
-	sherpaCheck(err, "getting current work dir")
-	buildDir := fmt.Sprintf("%s/data/build/%s/%d", workdir, repoName, buildId)
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repoName, buildId)
 	_removeDir(buildDir)
 }
 

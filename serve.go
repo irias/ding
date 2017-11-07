@@ -19,6 +19,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+var (
+	dingWorkDir string
+)
+
 func sherpaCheck(err error, msg string) {
 	if err == nil {
 		return
@@ -81,6 +85,16 @@ func checkParseRow(row *sql.Row, r interface{}, msg string) {
 	sherpaCheck(json.Unmarshal(buf, r), msg+": parsing json from database")
 }
 
+type job struct {
+	repoName string
+	rc       chan struct{}
+}
+
+var (
+	newJobs      chan job
+	finishedJobs chan string // repoName
+)
+
 func serve(args []string) {
 	serveFlag.Init("serve", flag.ExitOnError)
 	serveFlag.Usage = func() {
@@ -123,7 +137,7 @@ func serve(args []string) {
 	err = ff.Close()
 	check(err, "closing sherpa docs after parsing")
 
-	collector, err := collector.NewCollector("mraelaadkaart", nil)
+	collector, err := collector.NewCollector("ding", nil)
 	check(err, "creating sherpa prometheus collector")
 
 	handler, err := sherpa.NewHandler("/ding/", version, Ding{}, &doc, collector)
@@ -135,13 +149,80 @@ func serve(args []string) {
 	http.HandleFunc("/release/", serveRelease)
 	http.HandleFunc("/result/", serveResult)
 
+	dingWorkDir, err = os.Getwd()
+	check(err, "getting current work dir")
+
+	newJobs = make(chan job, 1)
+	finishedJobs = make(chan string, 1)
+	go func() {
+		active := map[string]struct{}{}
+		pending := map[string][]job{}
+
+		kick := func(repoName string) {
+			if _, ok := active[repoName]; ok {
+				return
+			}
+			jobs := pending[repoName]
+			if len(jobs) == 0 {
+				return
+			}
+			job := jobs[0]
+			pending[repoName] = jobs[1:]
+			active[repoName] = struct{}{}
+			job.rc <- struct{}{}
+		}
+
+		for {
+			select {
+			case job := <-newJobs:
+				pending[job.repoName] = append(pending[job.repoName], job)
+				kick(job.repoName)
+
+			case repoName := <-finishedJobs:
+				delete(active, repoName)
+				kick(repoName)
+			}
+		}
+	}()
+
 	unfinishedMsg := "marked as failed/unfinished at ding startup."
-	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null`, unfinishedMsg)
+	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null and status!='new'`, unfinishedMsg)
 	check(err, "marking unfinished builds as failed")
 	rows, err := result.RowsAffected()
 	check(err, "reading affected rows for marking unfinished builds as failed")
 	if rows > 0 {
 		log.Printf("marked %d unfinished builds as failed\n", rows)
+	}
+
+	var buf []byte
+	var newBuilds []struct {
+		Repo  Repo
+		Build Build
+	}
+	qnew := `
+		select coalesce(json_agg(x.*), '[]') from (
+			select row_to_json(repo.*) as repo, row_to_json(build.*) as build from repo join build on repo.id = build.repo_id where status='new'
+		) x
+	`
+	check(database.QueryRow(qnew).Scan(&buf), "fetching new builds from database")
+	check(json.Unmarshal(buf, &newBuilds), "parsing new builds from database")
+	for _, repoBuild := range newBuilds {
+		func(repo Repo, build Build) {
+			job := job{
+				repo.Name,
+				make(chan struct{}),
+			}
+			newJobs <- job
+			go func() {
+				<-job.rc
+				defer func() {
+					finishedJobs <- job.repoName
+				}()
+
+				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
+				_doBuild(repo, build, buildDir)
+			}()
+		}(repoBuild.Repo, repoBuild.Build)
 	}
 
 	log.Printf("version %s, listening on %s\n", version, *listenAddress)
