@@ -77,6 +77,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 
 		build = _build(tx, repo.Name, build.Id)
 	})
+	events <- eventBuild{repo.Name, build, ""}
 	return
 }
 
@@ -132,8 +133,11 @@ func doBuild(repo Repo, build Build, buildDir string) {
 
 func _doBuild(repo Repo, build Build, buildDir string) {
 	defer func() {
-		_, err := database.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
-		sherpaCheck(err, "marking build as finished in database")
+		transact(func(tx *sql.Tx) {
+			_, err := tx.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
+			sherpaCheck(err, "marking build as finished in database")
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+		})
 
 		if build.Branch != "" {
 			_cleanupBuilds(repo.Name, build.Branch)
@@ -142,13 +146,16 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		r := recover()
 		if r != nil {
 			if serr, ok := r.(*sherpa.Error); ok && serr.Code == "userError" {
-				err = database.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
-				sherpaCheck(err, "updating error message in database")
+				transact(func(tx *sql.Tx) {
+					err := tx.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
+					sherpaCheck(err, "updating error message in database")
+					events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+				})
 			}
 		}
 
 		var prevStatus string
-		err = database.QueryRow("select status from build join repo on build.repo_id = repo.id and repo.name = $1 and build.branch = $2 order by build.id desc offset 1 limit 1", repo.Name, build.Branch).Scan(&prevStatus)
+		err := database.QueryRow("select status from build join repo on build.repo_id = repo.id and repo.name = $1 and build.branch = $2 order by build.id desc offset 1 limit 1", repo.Name, build.Branch).Scan(&prevStatus)
 		if r != nil && (err != nil || prevStatus == "success") {
 			link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
 
@@ -206,8 +213,11 @@ Ding
 	}()
 
 	_updateStatus := func(status string) {
-		_, err := database.Exec("update build set status=$1 where id=$2", status, build.Id)
-		sherpaCheck(err, "updating build status in database")
+		transact(func(tx *sql.Tx) {
+			_, err := tx.Exec("update build set status=$1 where id=$2", status, build.Id)
+			sherpaCheck(err, "updating build status in database")
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+		})
 	}
 
 	env := []string{
@@ -230,9 +240,9 @@ Ding
 	// we clone without hard links because we chown later, don't want to mess up local git source repo's
 	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
 	if build.Branch == "" {
-		err = run(env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
+		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
 	} else {
-		err = run(env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
+		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
 	}
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
@@ -264,12 +274,15 @@ Ding
 		if build.CommitHash == "" {
 			sherpaCheck(fmt.Errorf("cannot find commit hash"), "finding commit hash")
 		}
-		err = database.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.Id).Scan(&build.Id)
-		sherpaCheck(err, "updating commit hash in database")
+		transact(func(tx *sql.Tx) {
+			err = tx.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.Id).Scan(&build.Id)
+			sherpaCheck(err, "updating commit hash in database")
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+		})
 	}
 
 	_updateStatus("checkout")
-	err = run(env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
+	err = run(build.Id, env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
 	sherpaUserCheck(err, "checkout revision")
 
 	if build.Branch == "" {
@@ -281,12 +294,15 @@ Ding
 		if build.Branch == "" {
 			sherpaCheck(fmt.Errorf("cannot determine branch for checkout"), "finding branch")
 		}
-		err = database.QueryRow(`update build set branch=$1 where id=$2 returning id`, build.Branch, build.Id).Scan(&build.Id)
-		sherpaCheck(err, "updating branch in database")
+		transact(func(tx *sql.Tx) {
+			err = tx.QueryRow(`update build set branch=$1 where id=$2 returning id`, build.Branch, build.Id).Scan(&build.Id)
+			sherpaCheck(err, "updating branch in database")
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+		})
 	}
 
 	_updateStatus("build")
-	err = run(env, "build", buildDir, checkoutDir, runas("../../scripts/build.sh")...)
+	err = run(build.Id, env, "build", buildDir, checkoutDir, runas("../../scripts/build.sh")...)
 	sherpaUserCheck(err, "building")
 
 	transact(func(tx *sql.Tx) {
@@ -302,6 +318,8 @@ Ding
 
 		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
 		sherpaCheck(err, "marking build as success in database")
+
+		events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
 	})
 }
 
@@ -360,7 +378,9 @@ func parseResults(checkoutDir, path string) (results []Result) {
 	return
 }
 
-func run(env []string, stage, buildDir, workDir string, args ...string) (err error) {
+func run(buildId int, env []string, step, buildDir, workDir string, args ...string) (err error) {
+	events <- eventOutput{buildId, step, "stdout", "", ""}
+
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = workDir
 	cmd.Env = env
@@ -387,23 +407,23 @@ func run(env []string, stage, buildDir, workDir string, args ...string) (err err
 			check(err2)
 		}
 	}()
-	if output, err = os.Create(buildDir + "/output/" + stage + ".output"); err != nil {
+	if output, err = os.Create(buildDir + "/output/" + step + ".output"); err != nil {
 		return fmt.Errorf("creating combined output file: %s", err)
 	}
-	output = LineWriter(output)
-	if stdout, err = os.Create(buildDir + "/output/" + stage + ".stdout"); err != nil {
+	output = LineWriter(output, "", "", -1)
+	if stdout, err = os.Create(buildDir + "/output/" + step + ".stdout"); err != nil {
 		return fmt.Errorf("creating stdout file: %s", err)
 	}
-	stdout = LineWriter(stdout)
+	stdout = LineWriter(stdout, step, "stdout", buildId)
 	cmd.Stdout = io.MultiWriter(stdout, output)
 
-	if stderr, err = os.Create(buildDir + "/output/" + stage + ".stderr"); err != nil {
+	if stderr, err = os.Create(buildDir + "/output/" + step + ".stderr"); err != nil {
 		return fmt.Errorf("opening stderr file: %s", err)
 	}
-	stderr = LineWriter(stderr)
+	stderr = LineWriter(stderr, step, "stderr", buildId)
 	cmd.Stderr = io.MultiWriter(stderr, output)
 
-	if nsecFile, err = os.Create(buildDir + "/output/" + stage + ".nsec"); err != nil {
+	if nsecFile, err = os.Create(buildDir + "/output/" + step + ".nsec"); err != nil {
 		return fmt.Errorf("opening nsec file: %s", err)
 	}
 
@@ -460,6 +480,8 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 		for _, filename := range filenames {
 			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
 		}
+
+		events <- eventBuild{repoName, _build(tx, repoName, buildId), ""}
 	})
 	return
 }
@@ -531,6 +553,8 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 		var id int64
 		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
+
+		events <- eventRepo{r, ""}
 	})
 	return
 }
@@ -541,6 +565,8 @@ func (Ding) SaveRepo(repo Repo) (r Repo) {
 		q := `update repo set name=$1, origin=$2, build_script=$3 where id=$4 returning row_to_json(repo.*)`
 		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.BuildScript, repo.Id), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
+
+		events <- eventRepo{r, ""}
 	})
 	return
 }
@@ -557,6 +583,7 @@ func (Ding) RemoveRepo(repoName string) {
 		var id int
 		sherpaCheckRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
 	})
+	events <- eventRemoveRepo{repoName, ""}
 
 	_removeDir(dingWorkDir + "/data/build/" + repoName)
 
@@ -661,6 +688,7 @@ func (Ding) RemoveBuild(buildId int) {
 
 		_removeBuild(tx, repoName, buildId)
 	})
+	events <- eventRemoveBuild{buildId, ""}
 }
 
 func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
@@ -709,6 +737,7 @@ func (Ding) CleanupBuilddir(repoName string, buildId int) (build Build) {
 		build = _build(tx, repoName, buildId)
 		fillBuild(repoName, &build)
 	})
+	events <- eventBuild{repoName, build, ""}
 	return
 }
 
@@ -740,6 +769,7 @@ func _cleanupBuilds(repoName, branch string) {
 			transact(func(tx *sql.Tx) {
 				_removeBuild(tx, repoName, b.Id)
 			})
+			events <- eventRemoveBuild{b.Id, ""}
 		}
 	}
 }

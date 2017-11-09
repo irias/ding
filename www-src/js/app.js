@@ -14,7 +14,7 @@ var app = angular.module('app', [
 	'ui.bootstrap.tabs',
 	'ui.bootstrap.datepickerPopup'
 ])
-.run(function($rootScope, $window, $uibModal, $q, Msg, Util) {
+.run(function($rootScope, $window, $uibModal, $q, $timeout, Msg, Util) {
 	api._wrapThenable = $q;
 
 	$rootScope._app_version = api._sherpa.version;
@@ -49,4 +49,24 @@ var app = angular.module('app', [
 		$rootScope.loading = false;
 		handleApiError(rejection);
 	});
+
+	if (!!window.EventSource) {
+		var events = new window.EventSource('/events');
+		events.addEventListener('message', function(e) {
+			var m = JSON.parse(e.data);
+			$rootScope.$broadcast(m.kind, m);
+		});
+		events.addEventListener('open', function(e) {
+			$timeout(function() {
+				$rootScope.sseError = '';
+			});
+		});
+		events.addEventListener('error', function(e) {
+			$timeout(function() {
+				$rootScope.sseError = 'Connection error, no live updates.';
+			});
+		});
+	} else {
+		$rootScope.noSSE = true;
+	}
 });

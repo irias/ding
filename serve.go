@@ -166,6 +166,9 @@ func serve(args []string) {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/release/", serveRelease)
 	http.HandleFunc("/result/", serveResult)
+	http.HandleFunc("/events", serveEvents)
+
+	go eventMux()
 
 	dingWorkDir, err = os.Getwd()
 	check(err, "getting current work dir")

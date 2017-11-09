@@ -1,9 +1,9 @@
 // don't warn about "use strict"
 /* jshint -W097 */
-/* global app, api */
+/* global app, api, _, console, window */
 'use strict';
 
-app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, repo, buildResult) {
+app.controller('Build', function($scope, $rootScope, $q, $location, $timeout, Msg, Util, repo, buildResult) {
 	$rootScope.breadcrumbs = Util.crumbs([
 		Util.crumb('repo/' + repo.name, 'Repo ' + repo.name),
 		Util.crumb('build/' + buildResult.build.id + '/', 'Build ' + buildResult.build.id)
@@ -13,6 +13,45 @@ app.controller('Build', function($scope, $rootScope, $q, $location, Msg, Util, r
 	$scope.buildResult = buildResult;
 	$scope.build = buildResult.build;
 	$scope.steps = buildResult.steps;
+
+	$scope.$on('build', function(x, e) {
+		var b = e.build;
+		if (b.id !== $scope.build.id) {
+			return;
+		}
+		$timeout(function() {
+			$scope.build = b;
+		});
+	});
+
+	$scope.$on('removeBuild', function(x, e) {
+		if (e.build_id === $scope.build.id) {
+			$location.path('/repo/' + repo.name + '/');
+			return;
+		}
+	});
+
+	$scope.$on('output', function(x, e) {
+		console.log('output', e);
+		if (e.build_id !== $scope.build.id) {
+			return;
+		}
+		$timeout(function() {
+			var step = _.find($scope.steps, {name: e.step});
+			console.log('steps', JSON.stringify($scope.steps));
+			if (!step) {
+				step = {
+					name: e.step,
+					output: '',
+					// nsec: 0,
+					_start: new Date().getTime()
+				};
+				$scope.steps.push(step);
+			}
+			step.output += e.text;
+		});
+	});
+
 
 	$scope.removeBuild = function() {
 		var build = $scope.build;

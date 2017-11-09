@@ -37,10 +37,18 @@
 			<div style="clear:both"></div>
 		</div>
 
+		<div ng-if="sseError" class="alert alert-danger" style="margin: 15px">
+			{{ sseError }}
+		</div>
+
 		<div class="page">
 			<div class="container-fluid">
 				<ng-view autoscroll="true">
 				</ng-view>
+
+				<div ng-if="noSSE" class="alert alert-info" style="display: inline-block; margin-bottom: 0">
+					You won't see live updates because your browser (perhaps one by Microsoft) does not support Server-Sent Events (SSE).
+				</div>
 			</div>
 		</div>
 		<footer class="footer">

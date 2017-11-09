@@ -6,12 +6,21 @@ import (
 )
 
 type lineWriter struct {
-	w   io.WriteCloser
-	buf []byte
+	w       io.WriteCloser
+	buf     []byte
+	step    string
+	where   string
+	buildId int
 }
 
-func LineWriter(w io.WriteCloser) io.WriteCloser {
-	return &lineWriter{w, nil}
+func LineWriter(w io.WriteCloser, step, where string, buildId int) io.WriteCloser {
+	return &lineWriter{w, nil, step, where, buildId}
+}
+
+func outputEvent(lw *lineWriter, buf []byte) {
+	if lw.where != "" {
+		events <- eventOutput{lw.buildId, lw.step, lw.where, string(buf), ""}
+	}
 }
 
 func (lw *lineWriter) Write(buf []byte) (int, error) {
@@ -23,12 +32,14 @@ func (lw *lineWriter) Write(buf []byte) (int, error) {
 	}
 
 	if len(lw.buf) > 0 {
+		outputEvent(lw, lw.buf)
 		_, err := lw.w.Write(lw.buf)
 		if err != nil {
 			return -1, err
 		}
 		lw.buf = nil
 	}
+	outputEvent(lw, buf[:i+1])
 	_, err := lw.w.Write(buf[:i+1])
 	if err != nil {
 		return -1, err
@@ -42,6 +53,7 @@ func (lw *lineWriter) Write(buf []byte) (int, error) {
 
 func (lw *lineWriter) Close() (err error) {
 	if len(lw.buf) > 0 {
+		outputEvent(lw, lw.buf)
 		_, err = lw.w.Write(lw.buf)
 	}
 	err2 := lw.w.Close()
