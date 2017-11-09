@@ -87,6 +87,18 @@ app.controller('Index', function($scope, $rootScope, $q, $uibModal, $location, $
 		return $uibModal.open({
 			templateUrl: 'static/html/modals/new-repo.html',
 			controller: function($scope, $uibModalInstance) {
+				$scope.repo = {
+					origin: '',
+					name: ''
+				};
+				$scope.$watch('repo.origin', function(v) {
+					if (!v || $scope.nameHadFocus) {
+						return;
+					}
+					var repoName = _.last(v.trim('/').split(/[:\/]/)).replace(/\.git$/, '');
+					$scope.repo.name = repoName;
+				});
+
 				$scope.create = function() {
 					return api.createRepo($scope.repo)
 					.then(function(repo) {
