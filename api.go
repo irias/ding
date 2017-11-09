@@ -24,7 +24,6 @@ var (
 		"clone",
 		"checkout",
 		"build",
-		"success",
 	}
 )
 
@@ -628,23 +627,22 @@ func parseInt(s string) int64 {
 func _buildResult(repoName string, build Build) (br BuildResult) {
 	buildDir := fmt.Sprintf("data/build/%s/%d/", repoName, build.Id)
 	br.BuildScript = readFile(buildDir + "scripts/build.sh")
+	br.Steps = []Step{}
+
+	if build.Status == "new" {
+		return
+	}
 
 	outputDir := buildDir + "output/"
 	for _, stepName := range stepNames {
-		var step Step
-		if stepName == "success" {
-			step.Name = "success"
-		} else {
-			step = Step{
-				Name:   stepName,
-				Stdout: readFileLax(outputDir + stepName + ".stdout"),
-				Stderr: readFileLax(outputDir + stepName + ".stderr"),
-				Output: readFileLax(outputDir + stepName + ".output"),
-				Nsec:   parseInt(readFileLax(outputDir + stepName + ".nsec")),
-			}
-		}
-		br.Steps = append(br.Steps, step)
-		if stepName == br.Build.Status {
+		br.Steps = append(br.Steps, Step{
+			Name:   stepName,
+			Stdout: readFileLax(outputDir + stepName + ".stdout"),
+			Stderr: readFileLax(outputDir + stepName + ".stderr"),
+			Output: readFileLax(outputDir + stepName + ".output"),
+			Nsec:   parseInt(readFileLax(outputDir + stepName + ".nsec")),
+		})
+		if stepName == build.Status {
 			break
 		}
 	}

@@ -90,7 +90,7 @@
 		<h3>Steps</h3>
 		<div ng-repeat="step in steps">
 			<h4>{{ step.name }}<span ng-if="step.name !== 'success' && step.nsec > 0"> (<timespent nsec="step.nsec"></timespent>)</span></h4>
-			<pre style="white-space: pre-wrap">{{ step.output }}</pre>
+			<div class="build-output bs-callout" ng-class="{'bs-callout-default': !$last && !build.finish, 'bs-callout-info': $last && !build.finish, 'bs-callout-danger': $last && build.finish && build.status !== 'success', 'bs-callout-success': $last && build.finish && build.status === 'success'}">{{ step.output }}</div>
 		</div>
 
 		<h3>Config</h3>

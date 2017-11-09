@@ -10,3 +10,9 @@ $color-success: #3c763d; // or #5cb85c with border #4cae4c
 @import "sortcol";
 @import "imagebackdrop";
 @import "loader";
+
+.build-output {
+	white-space: pre-wrap;
+	font-size: 13px;
+	font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+}
