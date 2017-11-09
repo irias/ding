@@ -12,8 +12,10 @@ app
 			'finish': '='
 		},
 		link: function(scope, element) {
-			var finish = scope.finish ? new Date(scope.finish) : new Date();
-			scope.elapsed = (finish.getTime() - new Date(scope.start).getTime()) / 1000;
+			scope.$watch('finish', function(v) {
+				var finish = v ? new Date(v) : new Date();
+				scope.elapsed = (finish.getTime() - new Date(scope.start).getTime()) / 1000;
+			});
 		}
 	};
 });
