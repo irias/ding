@@ -2,10 +2,9 @@
 	<div class="col-xs-12">
 		<div class="btn-group page-buttons">
 			<button btn="danger" icon="trash" loading-click="removeBuild()" ng-disabled="build.released || !build.finish">Delete build</button>
-			<button btn="danger" icon="trash" loading-click="cleanupBuilddir()" ng-disabled="build.builddir_removed || !build.finish">Clean up builddir</button>
-			<button btn="default" icon="cog" saving-click="retryBuild()">Rebuild</button>
-			<button btn="default" icon="cog" saving-click="buildBranch()">Rebuild branch</button>
-			<button btn="primary" icon="cog" saving-click="release()" ng-disabled="build.released || !build.finish">Release</button>
+			<button btn="danger" icon="eraser" loading-click="cleanupBuilddir()" ng-disabled="build.builddir_removed || !build.finish">Clean up builddir</button>
+			<button btn="default" icon="repeat" saving-click="retryBuild()">Rebuild</button>
+			<button btn="primary" icon="check" saving-click="release()" ng-disabled="build.released || !build.finish">Release</button>
 		</div>
 	</div>
 </div>

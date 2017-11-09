@@ -3,14 +3,14 @@
 		<div class="page-buttons btn-group">
 			<button btn="danger" icon="trash" loading-click="removeRepo()" uib-tooltip="Remove entire repository, including all builds and releases.">Remove repo</button>
 			<div class="btn-group" uib-dropdown>
-				<button btn="default" icon="cog" loading-click="createBuild(repo.name, 'master')" uib-tooltip="Build latest commit on master branch">Build master</button>
+				<button btn="default" icon="play" loading-click="createBuild(repo.name, 'master')" uib-tooltip="Build latest commit on master branch">Build master</button>
 				<button type="button" btn="default" uib-dropdown-toggle>
 					<span class="caret"></span>
 					<span class="sr-only">split button</span>
 				</button>
 				<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
 					<li role="menuitem">
-						<a icon="cog" loading-click="createBuild(repo.name, 'develop')" uib-tooltip="Build latest commit on develop branch">Build develop</a>
+						<a icon="play" loading-click="createBuild(repo.name, 'develop')" uib-tooltip="Build latest commit on develop branch">Build develop</a>
 					</li>
 				</ul>
 			</div>
@@ -109,33 +109,13 @@ exec make release"></textarea>
 						<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
 						<td><filesize size="build.disk_usage"></filesize></td>
 						<td><age time="build.start"></age></td>
-						<td>
+						<td style="min-width: 15rem">
 							<div class="btn-group">
-								<div class="btn-group" uib-dropdown>
-									<button btn="default sm" icon="cog" saving-click="retryBuild(build)">Rebuild</button>
-									<button type="button" btn="default sm" uib-dropdown-toggle>
-										<span class="caret"></span>
-										<span class="sr-only">split button</span>
-									</button>
-									<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
-										<li role="menuitem">
-											<a icon="cog" saving-click="buildBranch(build)">Rebuild branch latest</a>
-										</li>
-									</ul>
-								</div>
-								<div class="btn-group" uib-dropdown>
-									<button btn="danger sm" icon="trash" loading-click="cleanupBuilddir(build)" ng-disabled="build.builddir_removed || !build.finish">Cleanup</button>
-									<button type="button" btn="danger sm" uib-dropdown-toggle>
-										<span class="caret"></span>
-										<span class="sr-only">split button</span>
-									</button>
-									<ul class="dropdown-menu" uib-dropdown-menu role="menu" aria-labelledby="split-button">
-										<li role="menuitem">
-											<a icon="trash" loading-click="removeBuild(build)" link-disabled="build.released || !build.finish">Delete build</a>
-										</li>
-									</ul>
-								</div>
-								<a ng-href="#/repo/{{ repo.name }}/build/{{ build.id }}/" btn="default sm" link-disabled="build.builddir_removed">Open</a>
+								<button type="button" btn="default sm" icon="repeat" saving-click="createBuild(repo.name, build.branch, build.commit_hash)" uib-tooltip="Rebuild this revision"></button>
+								<button type="button" btn="danger sm" icon="eraser" loading-click="cleanupBuilddir(build)" ng-disabled="build.builddir_removed || !build.finish" uib-tooltip="Clean up the working directory for this build"></button>
+								<button type="button" btn="danger sm" icon="trash" loading-click="removeBuild(build)" ng-disabled="build.released || !build.finish" uib-tooltip="Remove this build"></button>
+								<a ng-href="#/repo/{{ repo.name }}/build/{{ build.id }}/" btn="default sm" link-disabled="build.builddir_removed" icon="folder-open-o" uib-tooltip="Open details for this build" ng-if="!(build.builddir_removed && build.released)"></a>
+								<a ng-href="#/repo/{{ repo.name }}/release/{{ build.id }}/" btn="primary sm" icon="folder-open" uib-tooltip="Open release" ng-if="build.builddir_removed && build.released"></a>
 							</div>
 						</td>
 					</tr>
@@ -179,9 +159,7 @@ exec make release"></textarea>
 						<td>{{ build.id }}</td>
 						<td><age time="build.start"></age></td>
 						<td>
-							<div class="btn-group">
-								<a ng-href="#/repo/{{ repo.name }}/release/{{ build.id }}/" btn="default sm">Open</a>
-							</div>
+							<a ng-href="#/repo/{{ repo.name }}/release/{{ build.id }}/" btn="primary sm" icon="folder-open" uib-tooltip="Open release"></a>
 						</td>
 					</tr>
 				</tbody>

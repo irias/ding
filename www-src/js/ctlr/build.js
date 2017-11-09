@@ -71,14 +71,6 @@ app.controller('Build', function($scope, $rootScope, $q, $location, $timeout, Ms
 		});
 	};
 
-	$scope.buildBranch = function() {
-		var build = $scope.build;
-		return api.createBuild(repo.name, build.branch, '')
-		.then(function(nbuild) {
-			$location.path('/repo/' + repo.name + '/build/' + nbuild.id + '/');
-		});
-	};
-
 	$scope.release = function() {
 		var build = $scope.build;
 		return api.createRelease(repo.name, build.id)

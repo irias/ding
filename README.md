@@ -7,48 +7,47 @@ Ding will start the compile, run tests, and make resulting binaries/files.  Such
 All command output of a build is kept around. If builds/tests go wrong, you can look at the output.
 Build dirs are kept around for some time, and garbage collected automatically when you have more than 10 builds, or after 2 weeks.
 
-Dingkick can be used in a git hook to signal that a build should start.
+Dingkick can be used in a git hook to signal that a build should start. Github webhooks are also supported.
+
+See INSTALL.md for instructions on how to install. "ding help" prints these instructions as well.
 
 
 # Todo
 
-- make this work with github repos, perhaps bitbucket as well.  requires having a public face. that requires adding auth...
-- get live updates during builds using SSE or something similar
-- do some extra steps? like coverage checking, and displaying the results.
-- add docs, at least a page describing the design.
+- depend on fewer shell scripts
+- check whether automatically cleaning builds works with cleaning dirs vs removing builds vs the releases
+- explain how to stop listening for github webhooks
+- for failed builds, show text for that block in red or something. on success, show a green success bar/block.
+- automatically make up repo name based on origin (which we'll ask first)
+- ask user to enter a "checkout dir", so we can work more easily with go
+
 
 ## Maybe
-- clone & checkout also through shell script?
+- do more? like reading test coverage somewhere and displaying that
 - add shell script to cleanup after a build? eg dropping a database.
-- add shell file that can be sourced in the other scripts, for common code?
 - timestamps in output lines?
-- security: can we run the builds as a separate user? how to make sure the build cannot touch files outside of its own directory?
-- be more helpful for building go projects by putting the checkout dir in place that can be used as gopath, in what is probably the right path (git.example.com:yourname.git -> git.example.com/yourname)?
 - compress released files with gzip and serve them gzipped if possible
+- more ways to send out notifications. eg webhook, telegram, slack.
+- support cloning mercurial repo's? perhaps others.
+- clone & checkout also through shell script?
 
 
 # Design
 
 ## steps
+- new
 - clone
 - checkout
 - build
-- test
-- release
 - success
 
 ## directory layout
-- config/<repo>/
-	build.sh
-	test.sh
-	release.sh
-- build/<repo>/<buildID>/
-	checkout/
-	scripts/
-		build.sh
-		test.sh
-		release.sh
-	output/
-		{build,test,release}.{stdout,stderr,output,nsec}
-- release/<repo>/<buildID>
-	filename
+data/
+	build/<repo>/<buildID>/
+		checkout/
+		scripts/
+			build.sh
+		output/
+			<step>.{stdout,stderr,output,nsec}
+	release/<repo>/<buildID>
+		filename
