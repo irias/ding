@@ -17,11 +17,9 @@ const (
 )
 
 var (
-	serveFlag     = flag.NewFlagSet("serve", flag.ExitOnError)
-	httpFS        http.FileSystem
-	version       string = "dev"
-	listenAddress        = flag.String("listen", ":6084", "address to listen on")
-	config        struct {
+	httpFS  http.FileSystem
+	version string = "dev"
+	config  struct {
 		ShowSherpaErrors      bool
 		PrintSherpaErrorStack bool
 		Database              string
@@ -30,8 +28,9 @@ var (
 			Name  string
 			Email string
 		}
-		BaseURL       string
-		IsolateBuilds struct {
+		BaseURL             string
+		GithubWebhookSecret string // for github webhook "push" events, to create a build; configure the same secret as in your github repository settings.
+		IsolateBuilds       struct {
 			Enabled    bool     // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
 			UidStart   int      // we'll use this + buildId as the unix uid to run the commands under
 			UidEnd     int      // if we reach this uid, we wrap around to uidStart again

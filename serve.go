@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"mime"
 	"net/http"
@@ -20,7 +24,11 @@ import (
 )
 
 var (
-	dingWorkDir string
+	dingWorkDir         string
+	serveFlag           = flag.NewFlagSet("serve", flag.ExitOnError)
+	listenAddress       = serveFlag.String("listen", ":6084", "address to listen on")
+	githubListenAddress = serveFlag.String("githublisten", ":6085", "address to listen on for github webhook events")
+	githubHandler       *http.ServeMux
 )
 
 func sherpaCheck(err error, msg string) {
@@ -235,8 +243,83 @@ func serve(args []string) {
 		}(repoBuild.Repo, repoBuild.Build)
 	}
 
-	log.Printf("version %s, listening on %s\n", version, *listenAddress)
+	if *githubListenAddress != "" {
+		log.Printf("ding version %s, listening on %s and for github webhooks on %s\n", version, *listenAddress, *githubListenAddress)
+		setupGithubHandler()
+		go func() {
+			server := &http.Server{Addr: *githubListenAddress, Handler: githubHandler}
+			log.Fatal(server.ListenAndServe())
+		}()
+	} else {
+		log.Printf("ding version %s, listening on %s\n", version, *listenAddress)
+	}
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+}
+
+func setupGithubHandler() {
+	githubHandler = http.NewServeMux()
+	githubHandler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "method not allowed", 405)
+			return
+		}
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		defer r.Body.Close()
+		sigstr := strings.TrimSpace(r.Header.Get("X-Hub-Signature"))
+		t := strings.Split(sigstr, "=")
+		if len(t) != 2 || t[0] != "sha1" || len(t[1]) != 2*sha1.Size {
+			http.Error(w, "malformed/missing X-Hub-Signature header", 400)
+			return
+		}
+		sig, err := hex.DecodeString(t[1])
+		if err != nil {
+			http.Error(w, "malformed hex in X-Hub-Signature", 400)
+			return
+		}
+		buf, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "error reading request", 500)
+			return
+		}
+		mac := hmac.New(sha1.New, []byte(config.GithubWebhookSecret))
+		mac.Write(buf)
+		exp := mac.Sum(nil)
+		if !hmac.Equal(exp, sig) {
+			log.Printf("bad github webhook signature, refusing message\n")
+			http.Error(w, "invalid signature", 400)
+			return
+		}
+		var event struct {
+			Repository struct {
+				Name string `json:"name"`
+			} `json:"repository"`
+			Ref   string `json:"ref"`
+			After string `json:"after"`
+		}
+		err = json.Unmarshal(buf, &event)
+		if err != nil {
+			log.Printf("bad github webhook JSON body: %s\n", err)
+			http.Error(w, "bad json", 400)
+			return
+		}
+		repoName := event.Repository.Name
+		branch := ""
+		if strings.HasPrefix(event.Ref, "refs/heads/") {
+			branch = event.Ref[len("refs/heads/"):]
+		}
+		commit := event.After
+		repo, build, buildDir, err := prepareBuild(repoName, branch, commit)
+		if err != nil {
+			log.Printf("error starting build for github webhook push even for repo %s, branch %s, commit %s\n", repoName, branch, commit)
+			http.Error(w, "could not create build", 500)
+			return
+		}
+		go doBuild(repo, build, buildDir)
+		w.WriteHeader(204)
+	})
 }
 
 func serveAsset(w http.ResponseWriter, r *http.Request) {

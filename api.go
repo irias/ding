@@ -80,6 +80,20 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 	return
 }
 
+func prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string, err error) {
+	defer func() {
+		xerr := recover()
+		if xerr == nil {
+			return
+		}
+		if serr, ok := xerr.(*sherpa.Error); ok {
+			err = fmt.Errorf("%s", serr.Error())
+		}
+	}()
+	repo, build, buildDir = _prepareBuild(repoName, branch, commit)
+	return repo, build, buildDir, nil
+}
+
 // Build a specific commit in the background, returning immediately.
 // `Branch` can be empty, in which case the actual branch is determined after checkout of `commit`. `Commit` can also be empty, in which case a clone is done and the checked out commit is looked up.
 func (Ding) CreateBuild(repoName, branch, commit string) Build {
