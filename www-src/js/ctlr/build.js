@@ -32,13 +32,11 @@ app.controller('Build', function($scope, $rootScope, $q, $location, $timeout, Ms
 	});
 
 	$scope.$on('output', function(x, e) {
-		console.log('output', e);
 		if (e.build_id !== $scope.build.id) {
 			return;
 		}
 		$timeout(function() {
 			var step = _.find($scope.steps, {name: e.step});
-			console.log('steps', JSON.stringify($scope.steps));
 			if (!step) {
 				step = {
 					name: e.step,
