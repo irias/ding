@@ -98,3 +98,6 @@ in the config file. You'll need to configure a "webhook" for your
 repositories at github.com, select "application/json" as event type,
 send only "push" events (default at the time of writing), and set
 the same secret as in the config file.
+
+If you don't want to listen for github webhook events, pass an empty
+string to the -githublisten flag.

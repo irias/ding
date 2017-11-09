@@ -27,7 +27,7 @@ var (
 	dingWorkDir         string
 	serveFlag           = flag.NewFlagSet("serve", flag.ExitOnError)
 	listenAddress       = serveFlag.String("listen", ":6084", "address to listen on")
-	githubListenAddress = serveFlag.String("githublisten", ":6085", "address to listen on for github webhook events")
+	githubListenAddress = serveFlag.String("githublisten", ":6085", "address to listen on for github webhook events, set empty for no listening")
 	githubHandler       *http.ServeMux
 )
 
