@@ -81,6 +81,10 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 }
 
 func prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string, err error) {
+	if branch == "" {
+		err = fmt.Errorf("Branch cannot be empty.")
+		return
+	}
 	defer func() {
 		xerr := recover()
 		if xerr == nil {
@@ -95,8 +99,12 @@ func prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buil
 }
 
 // Build a specific commit in the background, returning immediately.
-// `Branch` can be empty, in which case the actual branch is determined after checkout of `commit`. `Commit` can also be empty, in which case a clone is done and the checked out commit is looked up.
+// `Commit` can be empty, in which case the origin is cloned and the checked out commit is looked up.
 func (Ding) CreateBuild(repoName, branch, commit string) Build {
+	if branch == "" {
+		userError("Branch cannot be empty.")
+	}
+
 	repo, build, buildDir := _prepareBuild(repoName, branch, commit)
 	go func() {
 		defer func() {
@@ -138,9 +146,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
 		})
 
-		if build.Branch != "" {
-			_cleanupBuilds(repo.Name, build.Branch)
-		}
+		_cleanupBuilds(repo.Name, build.Branch)
 
 		r := recover()
 		if r != nil {
@@ -238,11 +244,7 @@ Ding
 	var err error
 	// we clone without hard links because we chown later, don't want to mess up local git source repo's
 	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-	if build.Branch == "" {
-		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
-	} else {
-		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.Name)
-	}
+	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
 	if config.IsolateBuilds.Enabled {
@@ -283,22 +285,6 @@ Ding
 	_updateStatus("checkout")
 	err = run(build.Id, env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
 	sherpaUserCheck(err, "checkout revision")
-
-	if build.Branch == "" {
-		cmd := execCommand(runas("sh", "-c", `git branch | sed 's/^..//' | grep -v "(HEAD detached at" | head -n1`)...)
-		cmd.Dir = checkoutDir
-		buf, err := cmd.Output()
-		sherpaCheck(err, "determining branch for commit")
-		build.Branch = strings.TrimSpace(string(buf))
-		if build.Branch == "" {
-			sherpaCheck(fmt.Errorf("cannot determine branch for checkout"), "finding branch")
-		}
-		transact(func(tx *sql.Tx) {
-			err = tx.QueryRow(`update build set branch=$1 where id=$2 returning id`, build.Branch, build.Id).Scan(&build.Id)
-			sherpaCheck(err, "updating branch in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
-		})
-	}
 
 	_updateStatus("build")
 	err = run(build.Id, env, "build", buildDir, checkoutDir, runas("../../scripts/build.sh")...)

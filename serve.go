@@ -309,7 +309,7 @@ func setupGithubHandler() {
 			return
 		}
 		repoName := event.Repository.Name
-		branch := ""
+		branch := "master"
 		if strings.HasPrefix(event.Ref, "refs/heads/") {
 			branch = event.Ref[len("refs/heads/"):]
 		}
