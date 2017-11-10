@@ -93,7 +93,7 @@ func eventMux() {
 				select {
 				case w.events <- buf:
 				default:
-					log.Println("sse: dropping event, client cannot keep up...")
+					// log.Println("sse: dropping event, client cannot keep up...")
 				}
 			}
 		}
