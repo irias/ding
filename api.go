@@ -245,7 +245,7 @@ Ding
 	var err error
 	// we clone without hard links because we chown later, don't want to mess up local git source repo's
 	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.CheckoutPath)
+	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
 	sherpaUserCheck(err, "cloning repository")
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.CheckoutPath)
 	if config.IsolateBuilds.Enabled {
