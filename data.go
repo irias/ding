@@ -5,10 +5,11 @@ import (
 )
 
 type Repo struct {
-	Id          int    `json:"id"`
-	Name        string `json:"name"`
-	Origin      string `json:"origin"`
-	BuildScript string `json:"build_script"`
+	Id           int    `json:"id"`
+	Name         string `json:"name"`
+	Origin       string `json:"origin"`
+	CheckoutPath string `json:"checkout_path"`
+	BuildScript  string `json:"build_script"`
 }
 
 type RepoBuilds struct {

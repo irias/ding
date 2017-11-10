@@ -399,7 +399,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `
-		select result.filename
+		select repo.checkout_path, result.filename
 		from result
 		join build on result.build_id = build.id
 		join repo on build.repo_id = repo.id
@@ -412,14 +412,14 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var name string
-		err = rows.Scan(&name)
+		var repoCheckoutPath, name string
+		err = rows.Scan(&repoCheckoutPath, &name)
 		if err != nil {
 			fail(err)
 			return
 		}
 		if strings.HasSuffix(name, "/"+basename) {
-			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoName, name)
+			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoCheckoutPath, name)
 			http.ServeFile(w, r, path)
 			return
 		}

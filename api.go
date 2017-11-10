@@ -226,6 +226,7 @@ Ding
 	}
 
 	env := []string{
+		"BUILDDIR=" + buildDir,
 		fmt.Sprintf("HOME=%s/home", buildDir),
 		fmt.Sprintf("BUILDID=%d", build.Id),
 		"REPONAME=" + repo.Name,
@@ -244,9 +245,9 @@ Ding
 	var err error
 	// we clone without hard links because we chown later, don't want to mess up local git source repo's
 	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.Name)
+	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", repo.Origin, "checkout/"+repo.CheckoutPath)
 	sherpaUserCheck(err, "cloning repository")
-	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.Name)
+	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.CheckoutPath)
 	if config.IsolateBuilds.Enabled {
 		chownBuild := append(config.IsolateBuilds.ChownBuild, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid), buildDir+"/checkout", buildDir+"/home")
 		cmd := execCommand(chownBuild...)
@@ -287,7 +288,7 @@ Ding
 	sherpaUserCheck(err, "checkout revision")
 
 	_updateStatus("build")
-	err = run(build.Id, env, "build", buildDir, checkoutDir, runas("../../scripts/build.sh")...)
+	err = run(build.Id, env, "build", buildDir, checkoutDir, runas(buildDir+"/scripts/build.sh")...)
 	sherpaUserCheck(err, "building")
 
 	transact(func(tx *sql.Tx) {
@@ -439,7 +440,9 @@ func toJSON(v interface{}) string {
 // Release a build.
 func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 	transact(func(tx *sql.Tx) {
-		build = _build(tx, repoName, buildId)
+		repo := _repo(tx, repoName)
+
+		build = _build(tx, repo.Name, buildId)
 		if build.Finish == nil {
 			panic(&sherpa.Error{Code: "userError", Message: "Build has not finished yet"})
 		}
@@ -447,7 +450,7 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 			panic(&sherpa.Error{Code: "userError", Message: "Build was not successful"})
 		}
 
-		br := _buildResult(repoName, build)
+		br := _buildResult(repo.Name, build)
 		steps := toJSON(br.Steps)
 
 		qrel := `insert into release (build_id, time, build_script, steps) values ($1, now(), $2, $3::json) returning build_id`
@@ -461,12 +464,12 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 		var filenames []string
 		q := `select coalesce(json_agg(result.filename), '[]') from result where build_id=$1`
 		sherpaCheckRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
-		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repoName, build.Id, repoName)
+		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repo.Name, build.Id, repo.CheckoutPath)
 		for _, filename := range filenames {
-			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repoName, build.Id, path.Base(filename)))
+			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repo.Name, build.Id, path.Base(filename)))
 		}
 
-		events <- eventBuild{repoName, _build(tx, repoName, buildId), ""}
+		events <- eventBuild{repo.Name, _build(tx, repo.Name, buildId), ""}
 	})
 	return
 }
@@ -531,12 +534,23 @@ func writeFile(path, content string) {
 	sherpaCheck(err, "writing file")
 }
 
+func _checkRepo(repo Repo) {
+	if repo.CheckoutPath == "" {
+		userError("Checkout path cannot be empty.")
+	}
+	if strings.HasPrefix(repo.CheckoutPath, "/") || strings.HasSuffix(repo.CheckoutPath, "/") {
+		userError("Checkout path cannot start or end with a slash.")
+	}
+}
+
 // Create new repository.
 func (Ding) CreateRepo(repo Repo) (r Repo) {
+	_checkRepo(repo)
+
 	transact(func(tx *sql.Tx) {
-		q := `insert into repo (name, origin, build_script) values ($1, $2, '') returning id`
+		q := `insert into repo (name, origin, checkout_path, build_script) values ($1, $2, $3, '') returning id`
 		var id int64
-		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin), &id, "inserting repository in database")
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.CheckoutPath), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
 
 		events <- eventRepo{r, ""}
@@ -546,9 +560,11 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 
 // Save repository.
 func (Ding) SaveRepo(repo Repo) (r Repo) {
+	_checkRepo(repo)
+
 	transact(func(tx *sql.Tx) {
-		q := `update repo set name=$1, origin=$2, build_script=$3 where id=$4 returning row_to_json(repo.*)`
-		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.BuildScript, repo.Id), &r, "updating repo in database")
+		q := `update repo set name=$1, origin=$2, checkout_path=$3, build_script=$4 where id=$5 returning row_to_json(repo.*)`
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.Id), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
 
 		events <- eventRepo{r, ""}

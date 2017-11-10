@@ -89,14 +89,22 @@ app.controller('Index', function($scope, $rootScope, $q, $uibModal, $location, $
 			controller: function($scope, $uibModalInstance) {
 				$scope.repo = {
 					origin: '',
-					name: ''
+					name: '',
+					checkout_path: ''
 				};
+				$scope.nameAutoFill = true;
+				$scope.checkoutpathAutoFill = true;
 				$scope.$watch('repo.origin', function(v) {
-					if (!v || $scope.nameHadFocus) {
+					if (!v) {
 						return;
 					}
-					var repoName = _.last(v.trim('/').split(/[:\/]/)).replace(/\.git$/, '');
-					$scope.repo.name = repoName;
+					var name = _.last(v.trim('/').split(/[:\/]/)).replace(/\.git$/, '');
+					if ($scope.nameAutoFill) {
+						$scope.repo.name = name;
+					}
+					if ($scope.checkoutpathAutoFill) {
+						$scope.repo.checkout_path = name;
+					}
 				});
 
 				$scope.create = function() {

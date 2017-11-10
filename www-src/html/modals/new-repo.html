@@ -9,7 +9,12 @@
 		</div>
 		<div class="form-group">
 			<label>Name</label>
-			<input type="text" class="form-control" placeholder="Name..." ng-model="repo.name" required ng-focus="nameHadFocus = true" />
+			<input type="text" class="form-control" placeholder="Name..." ng-model="repo.name" required ng-focus="nameAutoFill = false" ng-blur="nameAutoFill = repo.name === ''" />
+		</div>
+		<div class="form-group">
+			<label>Checkout path</label>
+			<input type="text" class="form-control" placeholder="src/githost/repo..." ng-model="repo.checkout_path" required ng-focus="checkoutpathAutoFill = false" ng-blur="checkoutpathAutoFill = repo.checkout_path === ''" />
+			<p class="help-block">For Go projects, you may want to match a GOPATH package path, like <tt>src/githost/user/project</tt>.</p>
 		</div>
 	</div>
 	<div class="modal-footer">
