@@ -12,7 +12,7 @@ frontend:
 test:
 	go test -cover -- local/config-test.json
 
-release: clean
+release:
 	./release.sh
 
 clean:
