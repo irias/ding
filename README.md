@@ -14,14 +14,6 @@ See INSTALL.md for instructions on how to install. "ding help" prints these inst
 
 # Todo
 
-- depend on fewer shell scripts
-- check whether automatically cleaning builds works with cleaning dirs vs removing builds vs the releases
-- explain how to stop listening for github webhooks
-- for failed builds, show text for that block in red or something. on success, show a green success bar/block.
-- automatically make up repo name based on origin (which we'll ask first)
-- ask user to enter a "checkout dir", so we can work more easily with go
-
-
 ## Maybe
 - do more? like reading test coverage somewhere and displaying that
 - add shell script to cleanup after a build? eg dropping a database.
