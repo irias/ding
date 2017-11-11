@@ -47,7 +47,7 @@
 				</ng-view>
 
 				<div ng-if="noSSE" class="alert alert-info" style="display: inline-block; margin-bottom: 0">
-					You won't see live updates because your browser (perhaps one by Microsoft) does not support Server-Sent Events (SSE).
+					You won't see live updates because your browser (perhaps one by Microsoft) does not yet support Server-Sent Events (SSE).
 				</div>
 			</div>
 		</div>
@@ -55,11 +55,12 @@
 			<div class="container-fluid">
 				<div class="row">
 					<div class="col-xs-6">
-						<span>{{ _app_version }}</span>
+						<span>ding-{{ _app_version }}</span>
+						<span style="margin-left: 1rem"><a href="/LICENSES">licenses</a> of included software</span>
 					</div>
 					<div class="col-xs-6">
 						<div class="text-right">
-							Developed by <a href="https://www.irias.nl/" style="color:inherit"><img src="static/img/irias-logo.png?v=REV" style="height:30px" /></a>
+							created by <a href="https://www.irias.nl/" style="color: inherit; margin-left: 0.75rem"><img src="static/img/irias-logo.png?v=REV" style="height:30px" /></a>
 						</div>
 					</div>
 				</div>

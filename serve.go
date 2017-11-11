@@ -162,6 +162,7 @@ func serve(args []string) {
 	check(err, "making sherpa handler")
 
 	http.HandleFunc("/", serveAsset)
+	http.HandleFunc("/LICENSES", serveAsset)
 	http.Handle("/ding/", handler)
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/release/", serveRelease)

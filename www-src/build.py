@@ -96,6 +96,58 @@ def build(dest):
 	d = target(s)
 	bl.test(d, [s], lambda: bl.copy(d, s))
 
+
+	d = target('LICENSES')
+	s = [
+		['Go runtime and standard library',
+			['www-src/licenses/go']],
+		['Bootstrap 3.3.6',
+			['www-src/licenses/bootstrap-3.3.6']],
+		['Fontawesome 4.6.3\n\nFont Awesome by Dave Gandy - http://fontawesome.io\nFont licensed under SIL OFL 1.1-license\nCode, such as CSS, under MIT-license',
+			[]],
+		['jQuery 3.1.0',
+			['www-src/licenses/jquery-3.1.0']],
+		['lodash 4.13.1',
+			['www-src/licenses/lodash-4.13.1']],
+		['AngularJS including the route module 1.5.7',
+			['www-src/licenses/angularjs-1.5.7']],
+		['UI Bootstrap 1.3.3',
+			['www-src/licenses/ui-bootstrap-1.3.3']],
+		['Sherpa Go server library',
+			['vendor/bitbucket.org/mjl/sherpa/LICENSE']],
+		['httpasset Go library',
+			['vendor/bitbucket.org/mjl/httpasset/LICENSE']],
+		['', ['vendor/github.com/beorn7/perks/LICENSE']],
+		['', ['vendor/github.com/golang/protobuf/LICENSE']],
+		['', ['vendor/github.com/irias/sherpa-prometheus-collector/LICENSE.md']],
+		['', ['vendor/github.com/lib/pq/LICENSE.md']],
+		['', ['vendor/github.com/matttproud/golang_protobuf_extensions/LICENSE']],
+		['Prometheus Go client', [
+			'vendor/github.com/prometheus/client_golang/LICENSE',
+			'vendor/github.com/prometheus/client_golang/NOTICE',
+			'vendor/github.com/prometheus/client_model/NOTICE',
+			'vendor/github.com/prometheus/common/NOTICE',
+			'vendor/github.com/prometheus/procfs/NOTICE']],
+	]
+	ss = []
+	for t in s:
+		ss += t[1]
+	def make_licenses(s):
+		r = '# Licenses for software included in Ding\n\n'
+		for name, files in s:
+			if name == '':
+				name = files[0]
+				if name.startswith('vendor/'):
+					name = name[len('vendor/'):]
+			r += '## ' + name + '\n\n'
+			for file in files:
+				r += open(file).read().decode('utf-8') + '\n'
+			r += '\n\n'
+		return r.encode('utf-8')
+	bl.test(d, ss, lambda: bl.write(d, make_licenses(s)))
+
+
+
 	sql = []
 	for f in sorted(os.listdir('sql')):
 		if not re.search('[0-9]{3}-.*\\.sql', f):
