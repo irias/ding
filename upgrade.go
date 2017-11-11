@@ -59,19 +59,6 @@ func runScripts(tx *sql.Tx, dbVersion int, scripts []Script, committing bool) {
 				if err != nil {
 					log.Printf("setting repo.build_script for repo %s: %s\n", repoName, err)
 				}
-
-				remove := func(path string) {
-					err := os.Remove(path)
-					if err != nil {
-						log.Printf("cleaning up shell script %s: %s", path, err)
-					}
-				}
-				if !committing {
-					log.Fatal("aborting upgrade, cannot rollback changes to disk")
-				}
-				remove(dir + "/build.sh")
-				remove(dir + "/test.sh")
-				remove(dir + "/release.sh")
 			}
 		}
 	}
