@@ -93,11 +93,15 @@ Finally, set "isolateBuilds" to true.
 # Github webhooks for push events
 
 Ding supports starting builds on pushes to github repositories.
-Start ding with the -githublisten flag and set "githubWebhookSecret"
-in the config file. You'll need to configure a "webhook" for your
-repositories at github.com, select "application/json" as event type,
-send only "push" events (default at the time of writing), and set
-the same secret as in the config file.
+Start ding with the -listenwebhooks flag and set "githubWebhookSecret"
+in the config file.
+
+You'll need to configure a "webhook" for your repositories at
+github.com:
+
+- select "application/json" as event type - send only "push" events
+(default at the time of writing) - set the same secret as in the
+config file
 
 If you don't want to listen for github webhook events, pass an empty
-string to the -githublisten flag.
+string to the -listenwebhook flag.

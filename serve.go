@@ -24,11 +24,11 @@ import (
 )
 
 var (
-	dingWorkDir         string
-	serveFlag           = flag.NewFlagSet("serve", flag.ExitOnError)
-	listenAddress       = serveFlag.String("listen", ":6084", "address to listen on")
-	githubListenAddress = serveFlag.String("githublisten", ":6085", "address to listen on for github webhook events, set empty for no listening")
-	githubHandler       *http.ServeMux
+	dingWorkDir          string
+	serveFlag            = flag.NewFlagSet("serve", flag.ExitOnError)
+	listenAddress        = serveFlag.String("listen", ":6084", "address to listen on")
+	listenWebhookAddress = serveFlag.String("listenwebhook", ":6085", "address to listen on for webhooks, like from github; set empty for no listening")
+	webhookHandler       *http.ServeMux
 )
 
 func sherpaCheck(err error, msg string) {
@@ -246,11 +246,11 @@ func serve(args []string) {
 		}(repoBuild.Repo, repoBuild.Build)
 	}
 
-	if *githubListenAddress != "" {
-		log.Printf("ding version %s, listening on %s and for github webhooks on %s\n", version, *listenAddress, *githubListenAddress)
-		setupGithubHandler()
+	if *listenWebhookAddress != "" {
+		log.Printf("ding version %s, listening on %s and for webhooks on %s\n", version, *listenAddress, *listenWebhookAddress)
+		setupWebhookHandler()
 		go func() {
-			server := &http.Server{Addr: *githubListenAddress, Handler: githubHandler}
+			server := &http.Server{Addr: *listenWebhookAddress, Handler: webhookHandler}
 			log.Fatal(server.ListenAndServe())
 		}()
 	} else {
@@ -259,15 +259,11 @@ func serve(args []string) {
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
-func setupGithubHandler() {
-	githubHandler = http.NewServeMux()
-	githubHandler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func setupWebhookHandler() {
+	webhookHandler = http.NewServeMux()
+	webhookHandler.HandleFunc("/github", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, "method not allowed", 405)
-			return
-		}
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
 			return
 		}
 		defer r.Body.Close()
