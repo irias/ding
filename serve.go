@@ -262,6 +262,10 @@ func serve(args []string) {
 func setupWebhookHandler() {
 	webhookHandler = http.NewServeMux()
 	webhookHandler.HandleFunc("/github", func(w http.ResponseWriter, r *http.Request) {
+		if config.GithubWebhookSecret == "" {
+			http.Error(w, "file not found", 404)
+			return
+		}
 		if r.Method != "POST" {
 			http.Error(w, "method not allowed", 405)
 			return
