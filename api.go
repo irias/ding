@@ -227,11 +227,12 @@ Ding
 
 	env := []string{
 		"BUILDDIR=" + buildDir,
+		"CHECKOUTPATH=" + repo.CheckoutPath,
 		fmt.Sprintf("HOME=%s/home", buildDir),
 		fmt.Sprintf("BUILDID=%d", build.Id),
 		"REPONAME=" + repo.Name,
 		"BRANCH=" + build.Branch,
-		"COMMITHASH=" + build.CommitHash,
+		"COMMIT=" + build.CommitHash,
 	}
 	for key, value := range config.Environment {
 		env = append(env, key+"="+value)
@@ -243,10 +244,27 @@ Ding
 
 	_updateStatus("clone")
 	var err error
-	// we clone without hard links because we chown later, don't want to mess up local git source repo's
-	// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-	err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
-	sherpaUserCheck(err, "cloning repository")
+	switch repo.VCS {
+	case "git":
+		// we clone without hard links because we chown later, don't want to mess up local git source repo's
+		// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
+		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
+		sherpaUserCheck(err, "cloning git repository")
+	case "mercurial":
+		cmd := []string{"hg", "clone", "--branch", build.Branch}
+		if build.CommitHash != "" {
+			cmd = append(cmd, "--rev", build.CommitHash, "--updaterev", build.CommitHash)
+		}
+		cmd = append(cmd, repo.Origin, "checkout/"+repo.CheckoutPath)
+		err = run(build.Id, env, "clone", buildDir, buildDir, cmd...)
+		sherpaUserCheck(err, "cloning mercurial repository")
+	case "command":
+		err = run(build.Id, env, "clone", buildDir, buildDir, "sh", "-c", repo.Origin)
+		sherpaUserCheck(err, "cloning repository from command")
+	default:
+		serverError("unexpected VCS " + repo.VCS)
+	}
+
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.CheckoutPath)
 	if config.IsolateBuilds.Enabled {
 		chownBuild := append(config.IsolateBuilds.ChownBuild, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid), buildDir+"/checkout", buildDir+"/home")
@@ -268,11 +286,31 @@ Ding
 	}
 
 	if build.CommitHash == "" {
-		cmd := execCommand(runas("git", "rev-parse", "HEAD")...)
-		cmd.Dir = checkoutDir
-		buf, err := cmd.Output()
-		sherpaCheck(err, "finding commit hash")
-		build.CommitHash = strings.TrimSpace(string(buf))
+		if repo.VCS == "command" {
+			clone := readFile(buildDir + "/output/clone.stdout")
+			clone = strings.TrimSpace(clone)
+			l := strings.Split(clone, "\n")
+			s := l[len(l)-1]
+			if !strings.HasPrefix(s, "commit:") {
+				userError(`output of clone command should start with "commit:" followed by the commit id/hash`)
+			}
+			build.CommitHash = s[len("commit:"):]
+		} else {
+			var command []string
+			switch repo.VCS {
+			case "git":
+				command = []string{"git", "rev-parse", "HEAD"}
+			case "mercurial":
+				command = []string{"hg", "id", "--id"}
+			default:
+				serverError("unexpected VCS " + repo.VCS)
+			}
+			cmd := execCommand(runas(command...)...)
+			cmd.Dir = checkoutDir
+			buf, err := cmd.Output()
+			sherpaCheck(err, "finding commit hash")
+			build.CommitHash = strings.TrimSpace(string(buf))
+		}
 		if build.CommitHash == "" {
 			sherpaCheck(fmt.Errorf("cannot find commit hash"), "finding commit hash")
 		}
@@ -283,9 +321,11 @@ Ding
 		})
 	}
 
-	_updateStatus("checkout")
-	err = run(build.Id, env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
-	sherpaUserCheck(err, "checkout revision")
+	if repo.VCS == "git" {
+		_updateStatus("checkout")
+		err = run(build.Id, env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
+		sherpaUserCheck(err, "checkout revision")
+	}
 
 	_updateStatus("build")
 	err = run(build.Id, env, "build", buildDir, checkoutDir, runas(buildDir+"/scripts/build.sh")...)
@@ -474,7 +514,7 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 	return
 }
 
-// RepoBuilds returns all repositories and their latest build per branch (always for master & develop, for other branches only if the latest build was less than 4 weeks ago).
+// RepoBuilds returns all repositories and their latest build per branch (always for master, default & develop, for other branches only if the latest build was less than 4 weeks ago).
 func (Ding) RepoBuilds() (rb []RepoBuilds) {
 	q := `
 		with repo_branch_builds as (
@@ -483,7 +523,7 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 			where id in (
 				select max(id) as id
 				from build
-				where branch in ('master', 'develop') or start > now() - interval '4 weeks'
+				where branch in ('master', 'default', 'develop') or start > now() - interval '4 weeks'
 				group by repo_id, branch
 			)
 		)
@@ -548,9 +588,9 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 	_checkRepo(repo)
 
 	transact(func(tx *sql.Tx) {
-		q := `insert into repo (name, origin, checkout_path, build_script) values ($1, $2, $3, '') returning id`
+		q := `insert into repo (name, vcs, origin, checkout_path, build_script) values ($1, $2, $3, $4, '') returning id`
 		var id int64
-		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.CheckoutPath), &id, "inserting repository in database")
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
 
 		events <- eventRepo{r, ""}
@@ -563,8 +603,8 @@ func (Ding) SaveRepo(repo Repo) (r Repo) {
 	_checkRepo(repo)
 
 	transact(func(tx *sql.Tx) {
-		q := `update repo set name=$1, origin=$2, checkout_path=$3, build_script=$4 where id=$5 returning row_to_json(repo.*)`
-		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.Id), &r, "updating repo in database")
+		q := `update repo set name=$1, vcs=$2, origin=$3, checkout_path=$4, build_script=$5 where id=$6 returning row_to_json(repo.*)`
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.Id), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
 
 		events <- eventRepo{r, ""}

@@ -3,7 +3,7 @@
 		<div class="page-buttons btn-group">
 			<button btn="danger" icon="trash" loading-click="removeRepo()" uib-tooltip="Remove entire repository, including all builds and releases.">Remove repo</button>
 			<div class="btn-group" uib-dropdown>
-				<button btn="default" icon="play" loading-click="createBuild(repo.name, 'master')" uib-tooltip="Build latest commit on master branch">Build master</button>
+				<button btn="default" icon="play" loading-click="createBuild(repo.name, repo.vcs === 'mercurial' ? 'default' : 'master')" uib-tooltip="Build latest commit on {{ repo.vcs === 'mercurial' ? 'default' : 'master' }} branch">Build {{ repo.vcs === 'mercurial' ? 'default' : 'master' }}</button>
 				<button type="button" btn="default" uib-dropdown-toggle>
 					<span class="caret"></span>
 					<span class="sr-only">split button</span>
@@ -30,10 +30,30 @@
 						<label>Name</label>
 						<input type="text" ng-model="repo.name" class="form-control" required placeholder="Name..." disabled />
 					</div>
-
 					<div class="form-group">
+						<label>Version control system (VCS)</label>
+						<select ng-model="repo.vcs" class="form-control">
+							<option value="git">Git</option>
+							<option value="mercurial">Mercurial</option>
+							<option value="command">Other (command)</option>
+						</select>
+					</div>
+
+					<div ng-if="repo.vcs !== 'command'" class="form-group">
 						<label>Origin</label>
-						<input type="text" ng-model="repo.origin" class="form-control" required placeholder="git.example.com:repo.git" />
+						<input type="text" ng-model="repo.origin" class="form-control" required placeholder="{{ repo.vcs === 'git' ? 'git.example.com:repo.git' : 'ssh://hg.example.com/repo' }}" />
+					</div>
+					<div ng-if="repo.vcs === 'command'" class="form-group">
+						<label>Command</label>
+						<textarea ng-model="repo.origin" class="form-control"  rows="6" placeholder="set -e
+if test &quot;$COMMIT&quot; = ''; then
+  vcs clone --branch $BRANCH https://vcs.example.com/repo checkout/$CHECKOUTPATH
+else
+  vcs clone --branch $BRANCH --commit $COMMIT https://vcs.example.com/repo checkout/$CHECKOUTPATH
+fi
+cd checkout/$CHECKOUTPATH
+vcs id | sed 's/^/commit:/'"></textarea>
+						<div class="bs-callout bs-callout-info">The command is executed using <tt>sh -c</tt>. It should check out $BRANCH (always set) and $COMMIT (if set, otherwise latest in branch) in checkout/$CHECKOUTPATH. If $COMMIT was empty, the command should end with a line of the form <tt>commit:...</tt>, with the commit id/hash on the dots.</div>
 					</div>
 
 					<div class="form-group">
@@ -58,26 +78,27 @@ make release"></textarea>
 		<div class="bs-callout bs-callout-info">
 			<p>Build.sh is run in a relatively clean environment, in the checkout directory. The following environment variables are set:</p>
 			<ul>
-				<li>$HOME, an empty directory</li>
-				<li>$BUILDID, the build number, should be used in the resulting file names</li>
-				<li>$REPONAME, the build number, should be used in the resulting file names</li>
-				<li>$BRANCH, the branch of the build, empty if not yet known</li>
-				<li>$COMMITHASH, the commithash, empty if not yet known</li>
-				<li>$BUILDDIR, the directory where all files related to the build are stored; files are checked out in $BUILDDIR/checkout/<i>checkout-path</i>, $HOME is $BUILDDIR/home</li>
+				<li>$BUILDDIR, the directory where all files related to the build are stored</li>
+				<li>$HOME, an empty directory, equal to $BUILDDIR/home</li>
+				<li>$CHECKOUTPATH, where files are checked out as configured for the repository, relative to $BUILDDIR/checkout</li>
+				<li>$BUILDID, the build number; you should try to use this in the filenames of releasable files</li>
+				<li>$REPONAME</li>
+				<li>$BRANCH, the branch of the build</li>
+				<li>$COMMIT, the commit id/hash, empty if not yet known</li>
 				<li>any key/value pair from the config "environment" object</li>
 			</ul>
 			<p>It should exit with status 0 only when successful.</p>
 			<p>The standard output of the release script is parsed. Lines that match this format are treated as released files:</p>
-			<blockquote><tt>"release:" command version os arch toolchain path</tt></blockquote>
+			<blockquote style="font-size: inherit"><tt>release:</tt> <i>command version os arch toolchain path</i></blockquote>
 			<p>The fields:</p>
 			<ul>
-				<li>"release:" is just the literal string <tt>release:</tt></li>
-				<li><tt>command</tt> is the name of the command, as you would type it in a terminal</li>
-				<li><tt>version</tt> is a semver version, x.y.z</li>
-				<li><tt>os</tt> must be one of: any, linux, darwin, openbsd, windows; the OS this program can run on, any is for platform-independent tools like a jar</li>
-				<li><tt>arch</tt> must be one of: any, amd64, arm64; similar to OS</li>
-				<li><tt>oolchain</tt> should describe the compiler and possibly other tools that are used to build this release</li>
-				<li><tt>path</tt> is the local path (either absolute or relative to the checkout directory) of the released file.</li>
+				<li><tt>release:</tt> is just the literal string</li>
+				<li><i>command</i> is the name of the command, as you would type it in a terminal</li>
+				<li><i>version</i> is a semver, <i>x.y.z</i></li>
+				<li><i>os</i> must be one of: <i>any, linux, darwin, openbsd, windows</i>; the OS this program can run on, <i>any</i> is for platform-independent tools like a jar</li>
+				<li><i>arch</i> must be one of: <i>any, amd64, arm64</i>; similar to OS</li>
+				<li><i>oolchain</i> should describe the compiler and possibly other tools that are used to build this release</li>
+				<li><i>path</i> is the local path (either absolute or relative to the checkout directory) of the released file.</li>
 			</ul>
 		</div>
 	</div>

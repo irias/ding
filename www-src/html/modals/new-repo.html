@@ -4,8 +4,28 @@
 <form role="form" saving-submit="create()">
 	<div class="modal-body">
 		<div class="form-group">
+			<label>Version control system (VCS)</label>
+			<select ng-model="repo.vcs" class="form-control">
+				<option value="git">Git</option>
+				<option value="mercurial">Mercurial</option>
+				<option value="command">Other (command)</option>
+			</select>
+		</div>
+		<div ng-if="repo.vcs !== 'command'" class="form-group">
 			<label>Origin</label>
-			<input type="text" class="form-control" placeholder="git.example.com:repo.git" ng-model="repo.origin" required autofocus />
+			<input type="text" class="form-control" placeholder="{{ repo.vcs === 'git' ? 'git.example.com:repo.git' : 'ssh://hg.example.com/repo' }}" ng-model="repo.origin" required autofocus />
+		</div>
+		<div ng-if="repo.vcs === 'command'" class="form-group">
+			<label>Command</label>
+			<textarea ng-model="repo.origin" class="form-control"  rows="6" placeholder="set -e
+if test &quot;$COMMIT&quot; = ''; then
+  vcs clone --branch $BRANCH https://vcs.example.com/repo checkout/$CHECKOUTPATH
+else
+  vcs clone --branch $BRANCH --commit $COMMIT https://vcs.example.com/repo checkout/$CHECKOUTPATH
+fi
+cd checkout/$CHECKOUTPATH
+vcs id | sed 's/^/commit:/'"></textarea>
+			<div class="bs-callout bs-callout-info">The command is executed using <tt>sh -c</tt>. It should check out $BRANCH (always set) and $COMMIT (if set, otherwise latest in branch) in checkout/$CHECKOUTPATH. If $COMMIT was empty, the command should end with a line of the form <tt>commit:...</tt>, with the commit id/hash on the dots.</div>
 		</div>
 		<div class="form-group">
 			<label>Name</label>

@@ -88,6 +88,7 @@ app.controller('Index', function($scope, $rootScope, $q, $uibModal, $location, $
 			templateUrl: 'static/html/modals/new-repo.html',
 			controller: function($scope, $uibModalInstance) {
 				$scope.repo = {
+					vcs: 'git',
 					origin: '',
 					name: '',
 					checkout_path: ''
@@ -95,7 +96,7 @@ app.controller('Index', function($scope, $rootScope, $q, $uibModal, $location, $
 				$scope.nameAutoFill = true;
 				$scope.checkoutpathAutoFill = true;
 				$scope.$watch('repo.origin', function(v) {
-					if (!v) {
+					if (!v || $scope.vcs === 'command') {
 						return;
 					}
 					var name = _.last(v.trim('/').split(/[:\/]/)).replace(/\.git$/, '');

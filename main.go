@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DB_VERSION = 7
+	DB_VERSION = 8
 )
 
 var (
