@@ -249,7 +249,7 @@ Ding
 	case "git":
 		// we clone without hard links because we chown later, don't want to mess up local git source repo's
 		// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
+		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--recursive", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
 		sherpaUserCheck(err, "cloning git repository")
 	case "mercurial":
 		cmd := []string{"hg", "clone", "--branch", build.Branch}
@@ -553,7 +553,7 @@ func (Ding) Repo(repoName string) (repo Repo) {
 	return
 }
 
-// Builds returns builds for a repo
+// Builds returns builds for a repo.
 func (Ding) Builds(repoName string) (builds []Build) {
 	q := `select coalesce(json_agg(bwr.* order by start desc), '[]') from build_with_result bwr join repo on bwr.repo_id = repo.id where repo.name=$1`
 	sherpaCheckRow(database.QueryRow(q, repoName), &builds, "fetching builds")

@@ -56,10 +56,21 @@ And now with commit if the previous was successful:
 	ding upgrade config.json commit
 
 
+# Dependencies
+
+Make sure you have git installed if you plan to build git
+repositories. Likewise, have mercurial (hg) installed for cloning
+such repositories.
+
+
 # Notifications
 
 You probably want to enable email notifications for failed builds.
 Configure a mail server, and set "mail", "enabled" to true.
+
+We don't support other mechanisms to send notifications (like
+outgoing webhooks, or IRC/telegram/slack/etc). Instead we have a
+real-time streaming updates API that can be used for those purposes.
 
 
 # Isolate builds
@@ -115,3 +126,30 @@ sign its requests, so the authentication is in the URL.
 
 If you don't want to listen for webhook events, pass an empty string
 to the -listenwebhook flag.
+
+
+# Webserver configuration
+
+You might want to run a HTTP proxy in front of Ding. Nginx is a
+popular choice. Here is an example config file that keeps server-sent
+events working:
+
+	server {
+		listen 10.0.0.1:80;
+		server_name ding-internal.example.com;
+
+		location / {
+			include /etc/nginx/proxy_params;
+			proxy_pass http://127.0.0.1:6084;
+		}
+		location = /events {
+			include /etc/nginx/proxy_params;
+			proxy_pass http://127.0.0.1:6084;
+			proxy_buffering off;
+			proxy_cache off;
+			proxy_set_header Connection '';
+			proxy_http_version 1.1;
+			chunked_transfer_encoding off;
+			proxy_read_timeout 1w;
+		}
+	}

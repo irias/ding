@@ -19,7 +19,7 @@
 			</div>
 			<table class="table table-striped">
 				<tr>
-					<td>Status</td>
+					<th>Status</th>
 					<td>
 						<build-status status="build.status" finish="build.finish" released="build.released"></build-status>
 						<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
@@ -28,23 +28,23 @@
 					</td>
 				</tr>
 				<tr>
-					<td>Build</td>
+					<th>Build</th>
 					<td>{{ build.id }}</td>
 				</tr>
 				<tr>
-					<td>Branch</td>
+					<th>Branch</th>
 					<td>{{ build.branch }}</td>
 				</tr>
 				<tr>
-					<td>Commit</td>
+					<th>Commit</th>
 					<td>{{ build.commit_hash }}</td>
 				</tr>
 				<tr>
-					<td>Build time</td>
+					<th>Build time</th>
 					<td><buildtime start="build.start" finish="build.finish"></buildtime></td>
 				</tr>
 				<tr>
-					<td>Build size</td>
+					<th>Build size</th>
 					<td><filesize size="build.disk_usage"></filesize></td>
 				</tr>
 			</table>

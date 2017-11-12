@@ -1,7 +1,7 @@
 <div class="row">
 	<div class="col-xs-12 col-md-10 col-md-offset-1 col-lg-8 col-lg-offset-2">
 		<h2>Ding</h2>
-		<p>Ding builds your software project, producing programs you can then download (and run/deploy, through other mechanisms outside of ding).</p>
+		<p>Ding builds your software projects, producing programs you can then use in other systems to deploy.</p>
 		<p>The following concepts play a role in ding:</p>
 		<ul>
 			<li>Repositories</li>
@@ -15,20 +15,81 @@
 		<p>A repository exists so you can create execute <em>builds</em>.</p>
 
 		<h3>Builds</h3>
-		<p>A build is an attempt to compile the software and create releasable results. A build can be in progress, failed or successful. Additionally, successful builds can be released. Builds are automatically cleaned up to reclaim disk space. Only the last build per branch and released builds are never deleted. Unreleased builds can also have just their build directory removed to reclaim space. Those builds exist in the database, but cannot be opened to see details.</p>
+		<p>A build is an attempt to compile the software and create releasable results. A build runs through (hopefully all) of the following steps:</p>
+
+		<h4>new</h4>
+		<p>Waiting to be started: we only run 1 concurrent build per repository, regardless of branch.</p>
+
+		<h4>clone</h4>
+		<p>Ding calls the external programs git, or hg (for mercurial). If you specify <tt>origin</tt> URLs that make use of SSH, you will probably also need to install ssh keys in $HOME/.ssh for the unix user Ding is running under. In that case, make sure sure the private key file is only accessible by the user (not group) ding is running under.</p>
+
+		<h4>checkout</h4>
+		<p>Ensures the right revision is checkout out.</p>
+
+		<h4>build</h4>
+		<p>Executes your build.sh script. If you need resources such as a database, you could configure that before hand. Ding always runs at most 1 concurrent build per repository, so builds won't overwrite each other's data during a build. If you want to keep data in the database after a build is finished, you currently have two options: 1. Make a backup/dump of the database. 2. Dynamically create a database as part of the build script.</p>
+
+		<h4>success</h4>
+		<p>Successful builds should have results that can be released.</p>
+
+		<p>Builds are automatically cleaned up to reclaim disk space. Only the last build per branch and released builds are never deleted. Unreleased builds can also have just their build directory removed to reclaim space. Those builds exist in the database, but cannot be opened to see details.</p>
+
 		<p>The goal of a build is to create <em>results</em>.</p>
 
 		<h3>Results</h3>
-		<p>Results are just files that can be released. For java projects, they are typically jar files. For go projects, they are typically binary files, one for each architecture you compiled for. The output of your build.sh scripts points to the files that are results. Results only exist in the build directory and are removed when the build is removed.</p>
+		<p>Results are just files that can be released. For Java projects, they are typically jar files. For Go projects, they are typically binary files, one for each architecture you compiled for. The output of your build.sh scripts points to the files that are results. Results only exist in the build directory and are removed when the build is removed.</p>
 		<p>But you can also <em>release</em> results.</p>
 
 		<h3>Releases</h3>
-		<p>Releases are builds of which the results have been saved away. The build directory can then be cleaned, but the resulting files will remain available.</p>
+		<p>Releases are builds of which the results have been saved outside the build directory, including the build script and output captured during the build. The build directory can then be cleaned.</p>
 
-		<h2>What ding is not</h2>
-		<p>Ding does not deploy your software.</p>
-
-		<h2>More</h2>
+		<h2>API</h2>
 		<p>Ding has an API at <a href="/ding/">/ding/</a>.</p>
+
+		<h2>Example build.sh scripts</h2>
+		<p>Build scripts will vary over projects. Nevertheless, some examples for inspiration:</p>
+
+		<h3>Ding, written in Go</h3>
+		<p>For Go projects, it is helpful to have them checked out in a path that starts with <tt>src/</tt>, so you can easily configure a private $GOPATH. This assumes you've configured $TOOLCHAINS through Ding's config.json, and extracted the Go version of your choice under $TOOLCHAINS/go.</p>
+		<pre style="white-space: pre-wrap">
+#!/bin/bash
+set -e
+
+export GOPATH=$BUILDDIR/checkout
+export PATH=$PATH:$TOOLCHAINS/go/bin:$GOPATH/bin
+
+mkdir local &&
+cat &gt;local/config-test.json &lt;&lt;EOF &&
+... a config as shown in INSTALL.md ...
+EOF
+
+(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install) &&
+mkdir -p node_modules/.bin && ln -s $(which jshint) node_modules/.bin/ &&
+make build test release</pre>
+
+		<h3>Sherpa-servlet-example, written in Java</h3>
+		<pre style="white-space: pre-wrap">
+#!/bin/bash
+set -e
+
+VERSION=$(sed -n 's/^.*&lt;version&gt;\(.*\)&lt;\/version&gt;.*/\1/p' pom.xml  | head -n1)
+
+mvn -B install
+echo release: sherpa-servlet-example.jar $VERSION any any `javac -version 2&gt;&1 | cut -f2 -d' '` target/SherpaServletExample-$VERSION.jar</pre>
+
+		<h2>File hierarchy</h2>
+		<p>For the curious, this is how files are layed out by Ding:</p>
+		<pre style="white-space: pre-wrap">
+data/
+    build/&lt;repoName&gt;/&lt;buildID&gt;/  ($BUILDDIR during builds)
+        checkout/$CHECKOUTPATH/  (working directory for build.sh)
+        scripts/
+            build.sh             (copied from database before build)
+        output/
+            {clone,checkout,build}.{stdout,stderr,output,nsec}
+        home/                    ($HOME during builds)
+    release/&lt;repoName&gt;/&lt;buildId&gt;/
+        &lt;result-filename&gt;
+</pre>
 	</div>
 </div>
