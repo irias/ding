@@ -5,49 +5,45 @@ import (
 )
 
 type eventStringer interface {
-	eventString() ([]byte, error)
+	eventString() (string, []byte, error)
 }
 
 type eventRepo struct {
-	Repo Repo   `json:"repo"`
-	Kind string `json:"kind"`
+	Repo Repo `json:"repo"`
 }
 
-func (e eventRepo) eventString() ([]byte, error) {
-	e.Kind = "repo"
-	return json.Marshal(e)
+func (e eventRepo) eventString() (string, []byte, error) {
+	buf, err := json.Marshal(e)
+	return "repo", buf, err
 }
 
 type eventRemoveRepo struct {
 	RepoName string `json:"repo_name"`
-	Kind     string `json:"kind"`
 }
 
-func (e eventRemoveRepo) eventString() ([]byte, error) {
-	e.Kind = "removeRepo"
-	return json.Marshal(e)
+func (e eventRemoveRepo) eventString() (string, []byte, error) {
+	buf, err := json.Marshal(e)
+	return "removeRepo", buf, err
 }
 
 type eventBuild struct {
 	RepoName string `json:"repo_name"`
 	Build    Build  `json:"build"`
-	Kind     string `json:"kind"`
 }
 
-func (e eventBuild) eventString() ([]byte, error) {
-	e.Kind = "build"
-	return json.Marshal(e)
+func (e eventBuild) eventString() (string, []byte, error) {
+	buf, err := json.Marshal(e)
+	return "build", buf, err
 }
 
 type eventRemoveBuild struct {
 	RepoName string `json:"repo_name"`
 	BuildId  int    `json:"build_id"`
-	Kind     string `json:"kind"`
 }
 
-func (e eventRemoveBuild) eventString() ([]byte, error) {
-	e.Kind = "removeBuild"
-	return json.Marshal(e)
+func (e eventRemoveBuild) eventString() (string, []byte, error) {
+	buf, err := json.Marshal(e)
+	return "removeBuild", buf, err
 }
 
 type eventOutput struct {
@@ -55,10 +51,9 @@ type eventOutput struct {
 	Step    string `json:"step"`
 	Where   string `json:"where"`
 	Text    string `json:"text"`
-	Kind    string `json:"kind"`
 }
 
-func (e eventOutput) eventString() ([]byte, error) {
-	e.Kind = "output"
-	return json.Marshal(e)
+func (e eventOutput) eventString() (string, []byte, error) {
+	buf, err := json.Marshal(e)
+	return "output", buf, err
 }

@@ -19,7 +19,7 @@ func LineWriter(w io.WriteCloser, step, where string, buildId int) io.WriteClose
 
 func outputEvent(lw *lineWriter, buf []byte) {
 	if lw.where != "" {
-		events <- eventOutput{lw.buildId, lw.step, lw.where, string(buf), ""}
+		events <- eventOutput{lw.buildId, lw.step, lw.where, string(buf)}
 	}
 }
 

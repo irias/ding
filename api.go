@@ -76,7 +76,7 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 
 		build = _build(tx, repo.Name, build.Id)
 	})
-	events <- eventBuild{repo.Name, build, ""}
+	events <- eventBuild{repo.Name, build}
 	return
 }
 
@@ -143,7 +143,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		transact(func(tx *sql.Tx) {
 			_, err := tx.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
 			sherpaCheck(err, "marking build as finished in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 		})
 
 		_cleanupBuilds(repo.Name, build.Branch)
@@ -154,7 +154,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 				transact(func(tx *sql.Tx) {
 					err := tx.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
 					sherpaCheck(err, "updating error message in database")
-					events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+					events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 				})
 			}
 		}
@@ -221,7 +221,7 @@ Ding
 		transact(func(tx *sql.Tx) {
 			_, err := tx.Exec("update build set status=$1 where id=$2", status, build.Id)
 			sherpaCheck(err, "updating build status in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 		})
 	}
 
@@ -317,7 +317,7 @@ Ding
 		transact(func(tx *sql.Tx) {
 			err = tx.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.Id).Scan(&build.Id)
 			sherpaCheck(err, "updating commit hash in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 		})
 	}
 
@@ -345,7 +345,7 @@ Ding
 		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
 		sherpaCheck(err, "marking build as success in database")
 
-		events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id), ""}
+		events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 	})
 }
 
@@ -405,7 +405,7 @@ func parseResults(checkoutDir, path string) (results []Result) {
 }
 
 func run(buildId int, env []string, step, buildDir, workDir string, args ...string) (err error) {
-	events <- eventOutput{buildId, step, "stdout", "", ""}
+	events <- eventOutput{buildId, step, "stdout", ""}
 
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = workDir
@@ -509,7 +509,7 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repo.Name, build.Id, path.Base(filename)))
 		}
 
-		events <- eventBuild{repo.Name, _build(tx, repo.Name, buildId), ""}
+		events <- eventBuild{repo.Name, _build(tx, repo.Name, buildId)}
 	})
 	return
 }
@@ -593,7 +593,7 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
 
-		events <- eventRepo{r, ""}
+		events <- eventRepo{r}
 	})
 	return
 }
@@ -607,7 +607,7 @@ func (Ding) SaveRepo(repo Repo) (r Repo) {
 		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.Id), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
 
-		events <- eventRepo{r, ""}
+		events <- eventRepo{r}
 	})
 	return
 }
@@ -624,7 +624,7 @@ func (Ding) RemoveRepo(repoName string) {
 		var id int
 		sherpaCheckRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
 	})
-	events <- eventRemoveRepo{repoName, ""}
+	events <- eventRemoveRepo{repoName}
 
 	_removeDir(dingWorkDir + "/data/build/" + repoName)
 
@@ -728,7 +728,7 @@ func (Ding) RemoveBuild(buildId int) {
 
 		_removeBuild(tx, repoName, buildId)
 	})
-	events <- eventRemoveBuild{repoName, buildId, ""}
+	events <- eventRemoveBuild{repoName, buildId}
 }
 
 func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
@@ -777,7 +777,7 @@ func (Ding) CleanupBuilddir(repoName string, buildId int) (build Build) {
 		build = _build(tx, repoName, buildId)
 		fillBuild(repoName, &build)
 	})
-	events <- eventBuild{repoName, build, ""}
+	events <- eventBuild{repoName, build}
 	return
 }
 
@@ -809,7 +809,7 @@ func _cleanupBuilds(repoName, branch string) {
 			transact(func(tx *sql.Tx) {
 				_removeBuild(tx, repoName, b.Id)
 			})
-			events <- eventRemoveBuild{repoName, b.Id, ""}
+			events <- eventRemoveBuild{repoName, b.Id}
 		}
 	}
 }

@@ -52,9 +52,18 @@ var app = angular.module('app', [
 
 	if (!!window.EventSource) {
 		var events = new window.EventSource('/events');
-		events.addEventListener('message', function(e) {
-			var m = JSON.parse(e.data);
-			$rootScope.$broadcast(m.kind, m);
+		var kinds = [
+			'repo',
+			'removeRepo',
+			'build',
+			'removeBuild',
+			'output'
+		];
+		_.forEach(kinds, function(kind) {
+			events.addEventListener(kind, function(e) {
+				var m = JSON.parse(e.data);
+				$rootScope.$broadcast(kind, m);
+			});
 		});
 		events.addEventListener('open', function(e) {
 			$timeout(function() {

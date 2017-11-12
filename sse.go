@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 type eventWorker struct {
@@ -30,21 +32,19 @@ func serveEvents(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
+	_, err := w.Write([]byte(": keepalive\n\n"))
+	if err != nil {
+		return
+	}
+	flusher.Flush()
+
 	ew := &eventWorker{make(chan []byte, 48)}
 	register <- ew
-	var err error
-	write := func(buf []byte) {
-		if err == nil {
-			_, err = w.Write(buf)
-		}
-	}
 
 	for {
 		select {
 		case msg := <-ew.events:
-			write([]byte("data: "))
-			write(msg)
-			write([]byte("\n\n"))
+			_, err = w.Write(msg)
 			flusher.Flush()
 			if err != nil {
 				unregister <- ew
@@ -68,6 +68,13 @@ func init() {
 	register = make(chan *eventWorker, 1)
 	unregister = make(chan *eventWorker, 0)
 	events = make(chan eventStringer, 10)
+
+	go func() {
+		for {
+			time.Sleep(120 * time.Second)
+			events <- nil
+		}
+	}()
 }
 
 func eventMux() {
@@ -84,10 +91,16 @@ func eventMux() {
 				}
 			}
 		case ev := <-events:
-			buf, err := ev.eventString()
-			if err != nil {
-				log.Printf("sse: marshalling event: %s\n", err)
-				continue
+			var buf []byte
+			if ev == nil {
+				buf = []byte(": keepalive\n\n")
+			} else {
+				event, evbuf, err := ev.eventString()
+				if err != nil {
+					log.Printf("sse: marshalling event: %s\n", err)
+					continue
+				}
+				buf = []byte(fmt.Sprintf("event: %s\ndata: %s\n\n", event, evbuf))
 			}
 			for _, w := range workers {
 				select {
