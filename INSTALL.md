@@ -17,6 +17,7 @@ You'll need an empty postgres database, and a config.json file like:
 		},
 		"baseURL": "https://ding.example.org",
 		"githubWebhookSecret": "very secret",
+		"bitbucketWebhookSecret": "very secret but different",
 		"isolateBuilds": {
 			"enabled": false,
 			"dingUid": 1001,
@@ -90,18 +91,27 @@ Set "uid" and "gid" to the uid/gid ding is running under.
 Finally, set "isolateBuilds" to true.
 
 
-# Github webhooks for push events
+# Github and bitbucket webhooks for push events
 
-Ding supports starting builds on pushes to github repositories.
-Start ding with the -listenwebhooks flag and set "githubWebhookSecret"
-in the config file.
+Ding supports starting builds on pushes to github or bitbucket
+repositories.  Start ding with the -listenwebhooks flag and set
+"githubWebhookSecret" and/or "bitbucketWebhookSecret" in the config
+file.
 
-You'll need to configure a "webhook" for your repositories at
-github.com:
+You'll need to configure a "webhook" for your repositories.
 
-- select "application/json" as event type - send only "push" events
+For github:
+
+- Make a URL that points to your server, with path /github/<repoName>.
+- Select "application/json" as event type - send only "push" events
 (default at the time of writing) - set the same secret as in the
-config file
+config file.
 
-If you don't want to listen for github webhook events, pass an empty
-string to the -listenwebhook flag.
+For bitbucket:
+
+- Make a URL that points to your server, with path
+/bitbucket/<repoName>/<bitbucketWebhookSecret>. Bitbucket does not
+sign its requests, so the authentication is in the URL.
+
+If you don't want to listen for webhook events, pass an empty string
+to the -listenwebhook flag.

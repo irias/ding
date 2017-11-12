@@ -76,7 +76,8 @@ make release"></textarea>
 		</div>
 
 		<div class="bs-callout bs-callout-info">
-			<p>Build.sh is run in a relatively clean environment, in the checkout directory. The following environment variables are set:</p>
+			<p>Build.sh is run in a relatively clean environment, in the checkout directory. It should exit with status 0 only when successful.</p>
+			<h5>Environment variables</h5>
 			<ul>
 				<li>$BUILDDIR, the directory where all files related to the build are stored</li>
 				<li>$HOME, an empty directory, equal to $BUILDDIR/home</li>
@@ -87,10 +88,9 @@ make release"></textarea>
 				<li>$COMMIT, the commit id/hash, empty if not yet known</li>
 				<li>any key/value pair from the config "environment" object</li>
 			</ul>
-			<p>It should exit with status 0 only when successful.</p>
+			<h5>Results</h5>
 			<p>The standard output of the release script is parsed. Lines that match this format are treated as released files:</p>
 			<blockquote style="font-size: inherit"><tt>release:</tt> <i>command version os arch toolchain path</i></blockquote>
-			<p>The fields:</p>
 			<ul>
 				<li><tt>release:</tt> is just the literal string</li>
 				<li><i>command</i> is the name of the command, as you would type it in a terminal</li>
@@ -98,7 +98,7 @@ make release"></textarea>
 				<li><i>os</i> must be one of: <i>any, linux, darwin, openbsd, windows</i>; the OS this program can run on, <i>any</i> is for platform-independent tools like a jar</li>
 				<li><i>arch</i> must be one of: <i>any, amd64, arm64</i>; similar to OS</li>
 				<li><i>toolchain</i> should describe the compiler and possibly other tools that are used to build this release</li>
-				<li><i>path</i> is the local path (either absolute or relative to the checkout directory) of the released file.</li>
+				<li><i>path</i> is the local path (either absolute or relative to the checkout directory) of the released file</li>
 			</ul>
 		</div>
 	</div>
@@ -192,6 +192,18 @@ make release"></textarea>
 					</tr>
 				</tbody>
 			</table>
+		</div>
+	</div>
+
+	<div class="col-xs-12 col-lg-6">
+		<div class="bs-callout bs-callout-info">
+			<h5>Webhooks</h5>
+			<p>You can configure github and bitbucket to send "push" events after they've received new commits. The URL paths you need to configure at the repositories:</p>
+			<ul>
+				<li>For github: <tt>/github/<i>repoName</i></tt></li>
+				<li>For bitbucket: <tt>/bitbucket/<i>repoName</i>/<i>secret</i></tt></li>
+			</ul>
+			<p>You'll need to configure secrets in the config file, see <a href="/INSTALL.md">INSTALL.md</a> for the details. </p>
 		</div>
 	</div>
 </div>
