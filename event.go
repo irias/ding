@@ -40,8 +40,9 @@ func (e eventBuild) eventString() ([]byte, error) {
 }
 
 type eventRemoveBuild struct {
-	BuildId int    `json:"build_id"`
-	Kind    string `json:"kind"`
+	RepoName string `json:"repo_name"`
+	BuildId  int    `json:"build_id"`
+	Kind     string `json:"kind"`
 }
 
 func (e eventRemoveBuild) eventString() ([]byte, error) {

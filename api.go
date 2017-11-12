@@ -728,7 +728,7 @@ func (Ding) RemoveBuild(buildId int) {
 
 		_removeBuild(tx, repoName, buildId)
 	})
-	events <- eventRemoveBuild{buildId, ""}
+	events <- eventRemoveBuild{repoName, buildId, ""}
 }
 
 func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
@@ -809,7 +809,7 @@ func _cleanupBuilds(repoName, branch string) {
 			transact(func(tx *sql.Tx) {
 				_removeBuild(tx, repoName, b.Id)
 			})
-			events <- eventRemoveBuild{b.Id, ""}
+			events <- eventRemoveBuild{repoName, b.Id, ""}
 		}
 	}
 }
