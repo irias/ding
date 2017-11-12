@@ -7,8 +7,8 @@ import (
 type Repo struct {
 	Id           int    `json:"id"`
 	Name         string `json:"name"`          // short name for repo, typically last element of repo URL/path
-	VCS          string `json:"vcs"`           // "git", "mercurial", or "command"
-	Origin       string `json:"origin"`        // git/mercurial "URL" (as understood by the respective commands), often SSH or HTTPS. if VCS is "command", this is executed using sh.
+	VCS          string `json:"vcs"`           // `git`, `mercurial` or `command`
+	Origin       string `json:"origin"`        // git/mercurial "URL" (as understood by the respective commands), often SSH or HTTPS. if `vcs` is `command`, this is executed using sh.
 	CheckoutPath string `json:"checkout_path"` // path to place the checkout in.
 	BuildScript  string `json:"build_script"`  // shell scripts that compiles the software, runs tests, and creates releasable files.
 }

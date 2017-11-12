@@ -7,6 +7,23 @@ import (
 	"time"
 )
 
+// Ding offers real-time updates to repositories and builds (including command output) through Server-Sent Events (SSE).
+// You'll receive the following events with a HTTP GET request to `/events`, encoded as JSON:
+// - `repo`, repository was updated or created
+// - `removeRepo`, repository was removed
+// - `build`, build was updated or created
+// - `removeBuild`, build was removed
+// - `output`, new lines of output from a command for an active build
+//
+// These types are described below, with an _event_-prefix. E.g. type _eventRepo_ describes the `repo` event.
+type SSE struct {
+}
+
+// No-op. This function only serves to include documentation for the server-sent event types.
+func (SSE) ExampleSSE() (repo eventRepo, removeRepo eventRemoveRepo, build eventBuild, removeBuild eventRemoveBuild, output eventOutput) {
+	return
+}
+
 type eventWorker struct {
 	events chan []byte
 }

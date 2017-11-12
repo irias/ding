@@ -29,6 +29,7 @@ var (
 
 // The Ding API lets you compile git branches, build binaries, run tests, and publish binaries.
 type Ding struct {
+	SSE SSE `sherpa:"Server-Sent Events"`
 }
 
 // Checks program status.

@@ -48,9 +48,9 @@ func (e eventRemoveBuild) eventString() (string, []byte, error) {
 
 type eventOutput struct {
 	BuildId int    `json:"build_id"`
-	Step    string `json:"step"`
-	Where   string `json:"where"`
-	Text    string `json:"text"`
+	Step    string `json:"step"`  // during which the output was generated, eg `clone`, `checkout`, `build`
+	Where   string `json:"where"` // `stdout` or `stderr`
+	Text    string `json:"text"`  // lines of text written
 }
 
 func (e eventOutput) eventString() (string, []byte, error) {
