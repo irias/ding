@@ -86,6 +86,9 @@ func main() {
 	typeCounts := map[string]int{}
 	countTypes(typeCounts, section)
 	moved := map[string]struct{}{}
+	for _, t := range section.Types {
+		moved[t.Name] = struct{}{}
+	}
 	for _, subsec := range section.Sections {
 		moveTypes(typeCounts, moved, subsec, section)
 	}
@@ -119,18 +122,20 @@ func countTypes(counts map[string]int, section *Section) {
 
 // todo: only move up to the common section, not always to the top section
 func moveTypes(typeCounts map[string]int, moved map[string]struct{}, section, topSection *Section) {
+	var ntypes []*Type
 	for _, t := range section.Types {
 		if typeCounts[t.Name] <= 1 {
+			ntypes = append(ntypes, t)
 			continue
 		}
 		_, ok := moved[t.Name]
-		if ok {
-			continue
+		if !ok {
+			moved[t.Name] = struct{}{}
+			topSection.Types = append(topSection.Types, t)
+			topSection.Typeset[t.Name] = struct{}{}
 		}
-		topSection.Types = append(topSection.Types, t)
-		moved[t.Name] = struct{}{}
-		topSection.Typeset[t.Name] = struct{}{}
 	}
+	section.Types = ntypes
 	for _, subsec := range section.Sections {
 		moveTypes(typeCounts, moved, subsec, topSection)
 	}

@@ -91,10 +91,10 @@ func main() {
 		switch serr := err.(type) {
 		case *sherpa.Error:
 			if serr.Code != "" {
-				log.Fatalf("error %v: %s", serr.Code, serr.Message)
+				log.Fatalf("error %v: %s\n", serr.Code, serr.Message)
 			}
 		}
-		log.Fatalf("error: %s", err)
+		log.Fatalf("error: %s\n", err)
 	}
 	err = json.NewEncoder(os.Stdout).Encode(&result)
 	if err != nil {
@@ -128,7 +128,7 @@ func doc(url string, args []string) {
 	var doc sherpa.Doc
 	cerr := c.Call(&doc, "_docs")
 	if cerr != nil {
-		log.Fatalf("fetching documentation: %s", cerr)
+		log.Fatalf("fetching documentation: %s\n", cerr)
 	}
 
 	if len(args) == 1 {

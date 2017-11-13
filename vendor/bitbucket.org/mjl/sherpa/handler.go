@@ -315,7 +315,7 @@ func NewHandler(path string, version string, api interface{}, doc *Doc, collecto
 	}
 
 	names := make([]string, 0, len(functions))
-	for name, _ := range functions {
+	for name := range functions {
 		names = append(names, name)
 	}
 

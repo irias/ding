@@ -17,7 +17,7 @@ func parseDoc(apiName, packagePath string) *Section {
 	fset := token.NewFileSet()
 	pkgs, first := parser.ParseDir(fset, packagePath, nil, parser.ParseComments)
 	if first != nil {
-		log.Fatalf("parsing code: %s", first)
+		log.Fatalf("parsing code: %s\n", first)
 	}
 	for _, pkg := range pkgs {
 		docpkg := doc.New(pkg, "", doc.AllDecls)
@@ -78,7 +78,7 @@ func parseSection(t *doc.Type, pkg *doc.Package) *Section {
 		}
 		subt := lookupType(pkg, ident.Name)
 		if subt == nil {
-			log.Fatalf("section %s not found", ident.Name)
+			log.Fatalf("section %s not found\n", ident.Name)
 		}
 		subsection := parseSection(subt, pkg)
 		subsection.Name = name
@@ -126,7 +126,7 @@ func gatherFieldType(typeName string, f *Field, e ast.Expr, section *Section) st
 		// we don't cross package boundaries for docs, eg time.Time
 		return t.Sel.Name
 	}
-	log.Fatalf("unsupported type in struct %s, field %s: %T", e)
+	log.Fatalf("unsupported type in struct %s, field %s: %T\n", typeName, f.Name, e)
 	return ""
 }
 
@@ -162,7 +162,7 @@ func ensureNamedType(t *doc.Type, section *Section) {
 	ts := t.Decl.Specs[0].(*ast.TypeSpec)
 	st, ok := ts.Type.(*ast.StructType)
 	if !ok {
-		log.Fatalf("unsupported param/return type %T", ts.Type)
+		log.Fatalf("unsupported param/return type %T\n", ts.Type)
 	}
 	for _, field := range st.Fields.List {
 		name := nameList(field.Names, field.Tag)

@@ -26,11 +26,8 @@ func sherpaDoc(section *Section) *sherpa.Doc {
 		Functions: []*sherpa.FunctionDoc{},
 		Sections:  []*sherpa.Doc{},
 	}
-	if len(section.Types) > 0 {
-		doc.Text += "\n\n## Types"
-	}
 	for _, t := range section.Types {
-		doc.Text += "\n### " + t.Name + "\n" + t.Doc + "\n"
+		doc.Text += "\n## Type " + t.Name + "\n" + t.Doc + "\n"
 		for _, f := range t.Fields {
 			doc.Text += generateField(f, "")
 		}
