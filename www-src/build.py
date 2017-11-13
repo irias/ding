@@ -167,7 +167,7 @@ def build(dest):
 	
 
 def usage():
-	print >>sys.stderr, 'usage: build.py [clean | install | frontend] ...'
+	print >>sys.stderr, 'usage: build.py [clean | install] ...'
 	sys.exit(1)
 
 def main(prog, *args):
