@@ -99,6 +99,8 @@ def build(dest):
 
 	d = target('LICENSES')
 	s = [
+		['Ding',
+			['LICENSE.md']],
 		['Go runtime and standard library',
 			['www-src/licenses/go']],
 		['Bootstrap 3.3.6',

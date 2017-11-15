@@ -1,6 +1,11 @@
-# Ding - build server for developers
+# Ding - self-hosted build server for developers
 
-Ding builds your software projects from git/mercurial/etc repositories.
+Ding builds your software projects from git/mercurial/etc repositories,
+can run tests and keep track of released software.
+
+
+![Ding screenshot](https://www.irias.nl/static/i/w1776-ding-screenshot-index.jpg)
+
 
 You will typically configure a "post-receive" (web)hook on your git
 server to tell ding to start a build.
@@ -14,12 +19,12 @@ wrong, you can look at the output.
 Build dirs are kept around for some time, and garbage collected
 automatically when you have more than 10 builds, or after 2 weeks.
 
-Dingkick is a tool you can use in a git hook to signal that a build
-should start. Github and bitbucket webhooks are also supported.
-
 Ding provides a web API at /ding/, open it once you've got it
 installed. It includes an option to get real-time updates to builds
 and repositories.
+
+Dingkick is a small tool you can use in a git hook to signal that a build
+should start. Github and bitbucket webhooks are also supported.
 
 See INSTALL.md for instructions on how to install. "ding help"
 prints these instructions as well. And you can read them at /INSTALL.md
@@ -62,6 +67,11 @@ an option, install the dependencies on the build server.
 because that term doesn't seem to be describing what we do.
 
 
+# License
+
+Ding is released under an MIT license. See LICENSE.md.
+
+
 # FAQ
 
 Q: Why are there no questions here?
@@ -89,11 +99,8 @@ See the Makefile on how to build and run this.
 - read some file from $HOME after a build and show it in build overviews? eg for code coverage, or whatever. easy & extensible.
 - provide access to the builddir from the previous build, eg to copy dependencies. or perhaps we could also do a faster clone ourselves.
 - implement timeouts for builds.  no output for X minutes -> kill.
-- do more? like reading test coverage somewhere and displaying that
 - add shell script to cleanup after a build? eg dropping a database.
 - timestamps in output lines?
 - compress released files with gzip and serve them gzipped if possible
-- more ways to send out notifications. eg webhook, telegram, slack.
-- support cloning mercurial repo's? perhaps others.
-- clone & checkout also through shell script?
+- more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
