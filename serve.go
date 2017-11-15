@@ -24,7 +24,6 @@ var (
 	serveFlag            = flag.NewFlagSet("serve", flag.ExitOnError)
 	listenAddress        = serveFlag.String("listen", ":6084", "address to listen on")
 	listenWebhookAddress = serveFlag.String("listenwebhook", ":6085", "address to listen on for webhooks, like from github; set empty for no listening")
-	webhookHandler       *http.ServeMux
 )
 
 func sherpaCheck(err error, msg string) {
@@ -245,7 +244,7 @@ func serve(args []string) {
 
 	if *listenWebhookAddress != "" {
 		log.Printf("ding version %s, listening on %s and for webhooks on %s\n", version, *listenAddress, *listenWebhookAddress)
-		webhookHandler = http.NewServeMux()
+		webhookHandler := http.NewServeMux()
 		webhookHandler.HandleFunc("/github/", githubHookHandler)
 		webhookHandler.HandleFunc("/bitbucket/", bitbucketHookHandler)
 		go func() {
