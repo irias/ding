@@ -1,87 +1,46 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/smtp"
 )
 
-type smtpClient interface {
-	StartTLS(config *tls.Config) error
-	Auth(a smtp.Auth) error
-	Mail(from string) error
-	Rcpt(to string) error
-	Data() (io.WriteCloser, error)
-	Close() error
+func _sendMailFailing(repo Repo, build Build, errmsg string) {
+	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+	subject := fmt.Sprintf("ding: failure: repo %s branch %s failing", repo.Name, build.Branch)
+	textMsg := fmt.Sprintf(`Hi!
+
+Your build for branch %s on repo %s is now failing:
+
+	%s
+
+Last output:
+
+	%s
+	%s
+
+Please fix, thanks!
+
+Cheers,
+Ding
+`, build.Branch, repo.Name, link, build.LastLine, errmsg)
+
+	_sendmail(config.Notify.Name, config.Notify.Email, subject, textMsg)
 }
 
-type nopCloser struct {
-	io.Writer
-}
+func _sendMailFixed(repo Repo, build Build) {
+	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+	subject := fmt.Sprintf("ding: resolved: repo %s branch %s is building again", repo.Name, build.Branch)
+	textMsg := fmt.Sprintf(`Hi!
 
-func (nopCloser) Close() error { return nil }
+You fixed the build for branch %s on repo %s:
 
-type fakeClient struct {
-}
+	%s
 
-func (*fakeClient) StartTLS(config *tls.Config) error { return nil }
-func (*fakeClient) Auth(a smtp.Auth) error            { return nil }
-func (*fakeClient) Mail(from string) error            { return nil }
-func (*fakeClient) Rcpt(to string) error              { return nil }
-func (*fakeClient) Data() (io.WriteCloser, error)     { return nopCloser{ioutil.Discard}, nil }
-func (*fakeClient) Close() error                      { return nil }
+You're the bomb, keep it up!
 
-func newSmtpClient() smtpClient {
-	if !config.Mail.Enabled {
-		return &fakeClient{}
-	}
-	addr := fmt.Sprintf("%s:%d", config.Mail.SmtpHost, config.Mail.SmtpPort)
-	c, err := smtp.Dial(addr)
-	sherpaCheck(err, "connecting to mail server")
-	return c
-}
+Cheers,
+Ding
+`, build.Branch, repo.Name, link)
 
-func _sendmail(toName, toEmail, subject, textMsg string) {
-	c := newSmtpClient()
-	defer func() {
-		if c != nil {
-			c.Close()
-		}
-		c = nil
-	}()
-
-	if config.Mail.SmtpTls {
-		tlsconfig := &tls.Config{ServerName: config.Mail.SmtpHost}
-		sherpaCheck(c.StartTLS(tlsconfig), "starting TLS with mail server")
-	}
-
-	if config.Mail.SmtpUsername != "" || config.Mail.SmtpPassword != "" {
-		auth := smtp.PlainAuth("", config.Mail.SmtpUsername, config.Mail.SmtpPassword, config.Mail.SmtpHost)
-		sherpaCheck(c.Auth(auth), "authenticating to mail server")
-	}
-
-	sherpaCheck(c.Mail(config.Mail.From), "setting from address")
-	sherpaCheck(c.Rcpt(toEmail), "setting recipient address")
-
-	data, err := c.Data()
-	sherpaCheck(err, "preparing to write mail")
-	if config.Mail.ReplyTo != "" {
-		_, err = fmt.Fprintf(data, "Reply-To: %s <%s>\n", config.Mail.ReplyToName, config.Mail.ReplyTo)
-		sherpaCheck(err, "writing reply-to header")
-	}
-	_, err = fmt.Fprintf(data, `From: %s <%s>
-To: %s <%s>
-Subject: %s
-
-`, config.Mail.FromName, config.Mail.From, toName, toEmail, subject)
-	sherpaCheck(err, "writing mail headers")
-
-	_, err = fmt.Fprint(data, textMsg)
-	sherpaCheck(err, "writing message")
-
-	sherpaCheck(data.Close(), "closing mail body")
-	sherpaCheck(c.Close(), "closing mail connection")
-	c = nil
+	_sendmail(config.Notify.Name, config.Notify.Email, subject, textMsg)
 }
