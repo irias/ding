@@ -13,7 +13,13 @@ test:
 	go test -cover -- local/config-test.json
 
 release:
-	./release.sh
+	-rm assets.zip 2>/dev/null
+	(cd assets && zip -qr0 ../assets.zip .)
+	env GOOS=linux GOARCH=amd64 ./release.sh
+	env GOOS=linux GOARCH=arm GOARM=6 ./release.sh
+	env GOOS=linux GOARCH=arm64 ./release.sh
+	env GOOS=darwin GOARCH=amd64 ./release.sh
+	env GOOS=openbsd GOARCH=amd64 ./release.sh
 
 clean:
 	go clean
