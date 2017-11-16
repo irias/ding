@@ -41,9 +41,7 @@ scripts ("ding upgrade")
 
 # Download
 
-Get the latest version at:
-
-	https://github.com/irias/ding/releases/latest
+Get the latest version at https://github.com/irias/ding/releases/latest
 
 
 # Features
