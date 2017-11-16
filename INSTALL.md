@@ -58,9 +58,8 @@ And now with commit if the previous was successful:
 
 # Dependencies
 
-Make sure you have git installed if you plan to build git
-repositories. Likewise, have mercurial (hg) installed for cloning
-such repositories.
+Make sure you have git installed if you plan to build git repositories.
+Or mercurial (hg), or any other VCS you want to use.
 
 
 # Notifications
@@ -153,3 +152,9 @@ events working:
 			proxy_read_timeout 1w;
 		}
 	}
+
+
+# Monitoring
+
+Ding exposes Prometheus metrics at HTTP endpoint /metrics.
+This includes statistics on usage for the API.

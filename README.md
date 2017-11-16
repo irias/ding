@@ -26,9 +26,24 @@ and repositories.
 Dingkick is a small tool you can use in a git hook to signal that a build
 should start. Github and bitbucket webhooks are also supported.
 
-See INSTALL.md for instructions on how to install. "ding help"
-prints these instructions as well. And you can read them at /INSTALL.md
-when you've got ding running.
+
+
+# Requirements
+
+- PostgreSQL database
+- BSD/Linux machine
+- git/mercurial or any other version control software you want to use
+
+Ding is distributed as a self-contained binary. It includes
+installation instructions (run "ding help") and database setup/upgrade
+scripts ("ding upgrade")
+
+
+# Download
+
+Get the latest version at:
+
+	https://github.com/irias/ding/releases/latest
 
 
 # Features
@@ -41,13 +56,12 @@ use your existing skills, avoid the burden of complex systems.
 - Isolated builds, each build starts under its own unix user id:
 extremely fast, and builds can't interfere with each other.
 
-- (Web) API for all functionality, which is what the web app is
-using.
+- (Web) API for all functionality (what the html5/js frontend is using).
 
 
 # Non-features
 
-We do _NOT_:
+We do _NOT_ ...
 
 - do deployments: Different task, different software. Ding exports
 released files which can be picked up by deployment tools.
@@ -74,8 +88,11 @@ Ding is released under an MIT license. See LICENSE.md.
 
 # FAQ
 
-Q: Why are there no questions here?
-A: Because you didn't ask them yet. Let us know your questions! Please?
+#### Q: Why are there no questions here?
+Because you didn't ask them yet. Let us know your questions! Please?
+
+
+For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
 
 
 # Developing
@@ -83,14 +100,15 @@ A: Because you didn't ask them yet. Let us know your questions! Please?
 You obviously need a Go compiler.
 But you'll also need:
 - python (v2) to build the frontend files
-- jshint through npm and node to check the JavaScript code
+- jshint through npm and nodejs to check the JavaScript code: mkdir -p node_modules/.bin && npm install jshint@2.9.5
 - sass through gem and ruby to create CSS files
 
-See the Makefile on how to build and run this.
+Now run: "make build test release"
 
 
 # Todo
 
+- write test code
 
 ## Maybe
 - merge the "checkout" step into "clone"? already not always necessary, and it's not a big enough step.
@@ -101,6 +119,9 @@ See the Makefile on how to build and run this.
 - implement timeouts for builds.  no output for X minutes -> kill.
 - add shell script to cleanup after a build? eg dropping a database.
 - timestamps in output lines?
-- compress released files with gzip and serve them gzipped if possible
+- compress released files with gzip and serve them gzipped if possible.
+- provide option to download a .zip or .tgz with all files in a release.
 - more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
+- make this work somewhat on windows?
+- add SSE statistics to prometheus metrics?
