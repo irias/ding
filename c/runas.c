@@ -148,7 +148,7 @@ main(int argc, char *argv[]) {
 	if(getuid() != uid || geteuid() != uid) {
 		errx(1, "real or effective uid not as expected");
 	}
-	/// if only there was a way to check suid...
+	// if only there was a way to check suid...
 #endif
 
 	execvp(argv[3], argv+3);
