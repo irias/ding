@@ -146,7 +146,7 @@ func serve(args []string) {
 	ff, err := httpFS.Open("/ding.json")
 	check(err, "opening sherpa docs")
 	err = json.NewDecoder(ff).Decode(&doc)
-	check(err, "parsing sherpa dos")
+	check(err, "parsing sherpa docs")
 	err = ff.Close()
 	check(err, "closing sherpa docs after parsing")
 
