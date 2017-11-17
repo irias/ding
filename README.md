@@ -47,13 +47,10 @@ Get the latest version at https://github.com/irias/ding/releases/latest
 # Features
 
 - Self-hosted build server. Keep control over your code and builds!
-
 - Simple. Get started quickly, experience the power of simplicity,
 use your existing skills, avoid the burden of complex systems.
-
 - Isolated builds, each build starts under its own unix user id:
 extremely fast, and builds can't interfere with each other.
-
 - (Web) API for all functionality (what the html5/js frontend is using).
 
 
@@ -63,18 +60,15 @@ We do _NOT_ ...
 
 - do deployments: Different task, different software. Ding exports
 released files which can be picked up by deployment tools.
-
 - want to be all things to everybody: Ding does not integrate with
 every VCS/SCM, does not have a plugin infrastructure, and does not
 hold your hand.
-
 - use docker images: Ding assumes you create self-contained programs,
 such as statically linked Go binaries or JVM .jar files. If you
 need other services, say a database server, just configure it when
 setting up your repository in Ding. If you need certain OS dependencies
 installed, first try to get rid of those dependencies. If that isn't
 an option, install the dependencies on the build server.
-
 - call ourselves "continuous integration" or CI server. Mostly
 because that term doesn't seem to be describing what we do.
 
@@ -107,11 +101,11 @@ Now run: "make build test release"
 # Todo
 
 - write test code
+- add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
+- merge the "checkout" step into "clone". already not always necessary, and it's not a big enough step.
 
 ## Maybe
-- merge the "checkout" step into "clone"? already not always necessary, and it's not a big enough step.
 - allow configuring a cleanup script, that is run when a builddir is removed. eg for dropping a database that was created in build.sh.
-- authentication. we currently expect ding to be installed on a private network, where everyone with access is trusted.
 - read some file from $HOME after a build and show it in build overviews? eg for code coverage, or whatever. easy & extensible.
 - provide access to the builddir from the previous build, eg to copy dependencies. or perhaps we could also do a faster clone ourselves.
 - implement timeouts for builds.  no output for X minutes -> kill.
