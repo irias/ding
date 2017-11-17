@@ -158,3 +158,7 @@ events working:
 
 Ding exposes Prometheus metrics at HTTP endpoint /metrics.
 This includes statistics on usage for the API.
+
+You can also set up simple HTTP monitoring on /ding/status. It's
+the "status" API call and it will a 5xx status when one of its
+underlying services (file system, database) is not available.
