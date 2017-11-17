@@ -57,6 +57,9 @@ func serveEvents(w http.ResponseWriter, r *http.Request) {
 
 	ew := &eventWorker{make(chan []byte, 48)}
 	register <- ew
+	defer func() {
+		unregister <- ew
+	}()
 
 	for {
 		select {
@@ -64,12 +67,10 @@ func serveEvents(w http.ResponseWriter, r *http.Request) {
 			_, err = w.Write(msg)
 			flusher.Flush()
 			if err != nil {
-				unregister <- ew
 				return
 			}
 
 		case <-closenotify:
-			unregister <- ew
 			return
 		}
 	}
