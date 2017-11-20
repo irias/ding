@@ -58,10 +58,9 @@ var (
 )
 
 func check(err error, msg string) {
-	if err == nil {
-		return
+	if err != nil {
+		log.Fatalf("%s: %s\n", msg, err)
 	}
-	log.Fatalf("%s: %s\n", msg, err)
 }
 
 func init() {
@@ -123,5 +122,6 @@ func main() {
 		fmt.Printf("%s\ndatabase schema version %d\n", version, DB_VERSION)
 	default:
 		flag.Usage()
+		os.Exit(2)
 	}
 }
