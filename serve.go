@@ -15,7 +15,7 @@ import (
 
 	"bitbucket.org/mjl/sherpa"
 	"github.com/irias/sherpa-prometheus-collector"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -29,6 +29,17 @@ var (
 func sherpaCheck(err error, msg string) {
 	if err == nil {
 		return
+	}
+
+	if pqe, ok := err.(*pq.Error); ok && !config.ShowSherpaErrors {
+		switch pqe.Code {
+		case "23503":
+			userError("References to this object still present in database.")
+		case "23505":
+			userError("Values are not unique.")
+		case "23514":
+			userError("Invalid value(s).")
+		}
 	}
 
 	m := msg
