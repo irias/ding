@@ -32,8 +32,9 @@ var (
 			Email string
 		}
 		BaseURL                string
-		GithubWebhookSecret    string // for github webhook "push" events, to create a build; configure the same secret as in your github repository settings.
-		BitbucketWebhookSecret string // we use this in the URL the user must configure at bitbucket; they don't have any other authentication mechanism.
+		GithubWebhookSecret    string   // for github webhook "push" events, to create a build; configure the same secret as in your github repository settings.
+		BitbucketWebhookSecret string   // we use this in the URL the user must configure at bitbucket; they don't have any other authentication mechanism.
+		Run                    []string // prefixed to commands we run. e.g. call "nice" or "timeout"
 		IsolateBuilds          struct {
 			Enabled    bool     // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
 			UidStart   int      // we'll use this + buildId as the unix uid to run the commands under

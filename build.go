@@ -201,8 +201,11 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 	// from now on, we run commands under its own uid, if config.IsolateBuilds is on.
 	RUNAS := append(config.IsolateBuilds.Runas, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid))
 	runas := func(args ...string) []string {
+		if len(config.Run) > 0 {
+			args = append(config.Run, args...)
+		}
 		if config.IsolateBuilds.Enabled {
-			return append(RUNAS, args...)
+			args = append(RUNAS, args...)
 		}
 		return args
 	}

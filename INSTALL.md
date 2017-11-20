@@ -18,6 +18,7 @@ You'll need an empty postgres database, and a config.json file like:
 		"baseURL": "https://ding.example.org",
 		"githubWebhookSecret": "very secret",
 		"bitbucketWebhookSecret": "very secret but different",
+		"run": ["nice", "timeout", "600"],
 		"isolateBuilds": {
 			"enabled": false,
 			"dingUid": 1001,
