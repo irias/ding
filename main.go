@@ -1,3 +1,6 @@
+// Ding is a self-hosted build server for developers.
+//
+// See the INSTALL.md file for installation instructions, or run "ding help".
 package main
 
 import (
