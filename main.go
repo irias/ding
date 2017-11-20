@@ -109,17 +109,7 @@ func main() {
 	case "upgrade":
 		upgrade(args)
 	case "version":
-		fl := flag.NewFlagSet(cmd, flag.ExitOnError)
-		fl.Usage = func() {
-			fmt.Println("usage: ding version")
-			fl.PrintDefaults()
-		}
-		fl.Parse(args)
-		if len(fl.Args()) != 0 {
-			fl.Usage()
-			os.Exit(2)
-		}
-		fmt.Printf("%s\ndatabase schema version %d\n", version, DB_VERSION)
+		_version(args)
 	default:
 		flag.Usage()
 		os.Exit(2)
