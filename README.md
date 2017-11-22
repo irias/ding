@@ -103,7 +103,6 @@ Now run: "make build test release"
 
 - write test code
 - add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
-- merge the "checkout" step into "clone". already not always necessary, and it's not a big enough step.
 - implement privsep, root starting the builds and doing chown. the ding user for webserver, the other build ids for building. then no more setuid and sudo configuration is required.
 - when on a build page, show it if a new build is already in progress, with a link to that new build
 

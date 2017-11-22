@@ -247,8 +247,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 	}
 
 	if repo.VCS == "git" {
-		_updateStatus("checkout")
-		err = run(build.Id, env, "checkout", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
+		err = run(build.Id, env, "clone", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
 		sherpaUserCheck(err, "checkout revision")
 	}
 

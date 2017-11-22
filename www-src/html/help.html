@@ -21,10 +21,7 @@
 		<p>Waiting to be started: we only run 1 concurrent build per repository, regardless of branch.</p>
 
 		<h4>clone</h4>
-		<p>Ding calls the external programs git, or hg (for mercurial). If you specify <tt>origin</tt> URLs that make use of SSH, you will probably also need to install ssh keys in $HOME/.ssh for the unix user Ding is running under. In that case, make sure sure the private key file is only accessible by the user (not group) ding is running under.</p>
-
-		<h4>checkout</h4>
-		<p>Ensures the right revision is checkout out.</p>
+		<p>Fetching source code. Ding calls the external programs git, or hg (for mercurial). If you specify <tt>origin</tt> URLs that make use of SSH, you will probably also need to install ssh keys in $HOME/.ssh for the unix user Ding is running under. In that case, make sure sure the private key file is only accessible by the user (not group) ding is running under.</p>
 
 		<h4>build</h4>
 		<p>Executes your build.sh script. If you need resources such as a database, you could configure that before hand. Ding always runs at most 1 concurrent build per repository, so builds won't overwrite each other's data during a build. If you want to keep data in the database after a build is finished, you currently have two options: 1. Make a backup/dump of the database. 2. Dynamically create a database as part of the build script.</p>
@@ -86,7 +83,7 @@ data/
         scripts/
             build.sh             (copied from database before build)
         output/
-            {clone,checkout,build}.{stdout,stderr,output,nsec}
+            {clone,build}.{stdout,stderr,output,nsec}
         home/                    ($HOME during builds)
     release/&lt;repoName&gt;/&lt;buildId&gt;/
         &lt;result-filename&gt;

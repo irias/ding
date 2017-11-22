@@ -17,7 +17,6 @@ import (
 var (
 	stepNames = []string{
 		"clone",
-		"checkout",
 		"build",
 	}
 )
