@@ -85,10 +85,9 @@ func serve(args []string) {
 	if config.IsolateBuilds.Enabled {
 		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
-				Uid:         uint32(config.IsolateBuilds.DingUid),
-				Gid:         uint32(config.IsolateBuilds.DingGid),
-				Groups:      []uint32{},
-				NoSetGroups: false,
+				Uid:    uint32(config.IsolateBuilds.DingUid),
+				Gid:    uint32(config.IsolateBuilds.DingGid),
+				Groups: []uint32{},
 			},
 		}
 	}
@@ -216,10 +215,9 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 	if config.IsolateBuilds.Enabled {
 		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
-				Uid:         uint32(uid),
-				Gid:         uint32(config.IsolateBuilds.DingGid),
-				Groups:      []uint32{},
-				NoSetGroups: false,
+				Uid:    uint32(uid),
+				Gid:    uint32(config.IsolateBuilds.DingGid),
+				Groups: []uint32{},
 			},
 		}
 	}
