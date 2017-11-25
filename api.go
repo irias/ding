@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -196,6 +197,28 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 	return
 }
 
+func fileCopy(src, dst string) {
+	err := os.MkdirAll(path.Dir(dst), 0777)
+	sherpaCheck(err, "making directory for copying result file")
+	sf, err := os.Open(src)
+	sherpaCheck(err, "open result file")
+	defer sf.Close()
+	df, err := os.Create(dst)
+	sherpaCheck(err, "creating destination result file")
+	defer func() {
+		err2 := df.Close()
+		if err == nil {
+			err = err2
+		}
+		if err != nil {
+			os.Remove(dst)
+			sherpaCheck(err, "installing result file")
+		}
+	}()
+	_, err = io.Copy(df, sf)
+	sherpaCheck(err, "copying result file to destination")
+}
+
 // RepoBuilds returns all repositories and their latest build per branch (always for master, default & develop, for other branches only if the latest build was less than 4 weeks ago).
 func (Ding) RepoBuilds() (rb []RepoBuilds) {
 	q := `
@@ -297,7 +320,7 @@ func (Ding) RemoveRepo(repoName string) {
 	})
 	events <- eventRemoveRepo{repoName}
 
-	_removeDir(dingWorkDir + "/data/build/" + repoName)
+	_removeDir(repoName, -1)
 
 	err := os.RemoveAll(fmt.Sprintf("data/release/%s", repoName))
 	sherpaCheck(err, "removing release directory")

@@ -1,22 +1,17 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"log"
-	"mime"
-	"net/http"
+	"net"
 	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
+	"os/exec"
+	"path/filepath"
+	"syscall"
 
-	"bitbucket.org/mjl/sherpa"
-	"github.com/irias/sherpa-prometheus-collector"
-	"github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -24,102 +19,13 @@ var (
 	serveFlag            = flag.NewFlagSet("serve", flag.ExitOnError)
 	listenAddress        = serveFlag.String("listen", ":6084", "address to listen on")
 	listenWebhookAddress = serveFlag.String("listenwebhook", ":6085", "address to listen on for webhooks, like from github; set empty for no listening")
-)
 
-func sherpaCheck(err error, msg string) {
-	if err == nil {
-		return
-	}
-
-	if pqe, ok := err.(*pq.Error); ok && !config.ShowSherpaErrors {
-		switch pqe.Code {
-		case "23503":
-			userError("References to this object still present in database.")
-		case "23505":
-			userError("Values are not unique.")
-		case "23514":
-			userError("Invalid value(s).")
-		}
-	}
-
-	m := msg
-	if m != "" {
-		m += ": "
-	}
-	m += err.Error()
-	if config.PrintSherpaErrorStack {
-		log.Println("sherpa serverError:", m)
-		debug.PrintStack()
-	}
-	if config.ShowSherpaErrors {
-		m = msg + ": " + err.Error()
-	} else {
-		m = "An error occurred. Please try again later or contact us."
-	}
-	serverError(m)
-}
-
-func serverError(m string) {
-	panic(&sherpa.Error{Code: "serverError", Message: m})
-}
-
-func sherpaUserCheck(err error, msg string) {
-	if err == nil {
-		return
-	}
-
-	m := msg
-	if m != "" {
-		m += ": "
-	}
-	m += err.Error()
-	if config.PrintSherpaErrorStack {
-		log.Println("sherpa userError:", m)
-		debug.PrintStack()
-	}
-	if config.ShowSherpaErrors {
-		m = msg + ": " + err.Error()
-	} else {
-		m = "An error occurred. Please try again later or contact us."
-	}
-	userError(m)
-}
-
-func userError(m string) {
-	panic(&sherpa.Error{Code: "userError", Message: m})
-}
-
-func sherpaCheckRow(row *sql.Row, r interface{}, msg string) {
-	var buf []byte
-	err := row.Scan(&buf)
-	if err == sql.ErrNoRows {
-		panic(&sherpa.Error{Code: "userNotFound", Message: "Not found"})
-	}
-	sherpaCheck(err, msg+": reading json from database row into buffer")
-	sherpaCheck(json.Unmarshal(buf, r), msg+": parsing json from database")
-}
-
-func checkRow(row *sql.Row, r interface{}, msg string) {
-	var buf []byte
-	err := row.Scan(&buf)
-	if err == sql.ErrNoRows {
-		log.Fatal("no row in result")
-	}
-	check(err, msg+": reading json from database row into buffer")
-	check(json.Unmarshal(buf, r), msg+": parsing json from database")
-}
-
-type job struct {
-	repoName string
-	rc       chan struct{}
-}
-
-var (
-	newJobs      chan job
-	finishedJobs chan string // repoName
+	rootRequests chan request // for http-serve
 )
 
 func serve(args []string) {
+	log.SetFlags(0)
+	log.SetPrefix("serve: ")
 	serveFlag.Init("serve", flag.ExitOnError)
 	serveFlag.Usage = func() {
 		fmt.Println("usage: ding [flags] serve config.json")
@@ -135,241 +41,200 @@ func serve(args []string) {
 	parseConfig(args[0])
 
 	var err error
-	database, err = sql.Open("postgres", config.Database)
-	check(err, "opening database connection")
-	var dbVersion int
-	err = database.QueryRow("select max(version) from schema_upgrades").Scan(&dbVersion)
-	check(err, "fetching database schema version")
-	if dbVersion != DB_VERSION {
-		log.Fatalf("bad database schema version, expected %d, saw %d", DB_VERSION, dbVersion)
-	}
-
-	// mostly here to ensure go http lib doesn't do content sniffing. if it does, file serving breaks because seeking http assets is only partially implemeneted.
-	mime.AddExtensionType(".woff", "font/woff")
-	mime.AddExtensionType(".woff2", "font/woff2")
-	mime.AddExtensionType(".eot", "application/vnd.ms-fontobject")
-	mime.AddExtensionType(".svg", "image/svg+xml")
-	mime.AddExtensionType(".ttf", "font/ttf")
-	mime.AddExtensionType(".otf", "font/otf")
-	mime.AddExtensionType(".map", "application/json") // browser trying to look for css/js .map files
-
-	var doc sherpa.Doc
-	ff, err := httpFS.Open("/ding.json")
-	check(err, "opening sherpa docs")
-	err = json.NewDecoder(ff).Decode(&doc)
-	check(err, "parsing sherpa docs")
-	err = ff.Close()
-	check(err, "closing sherpa docs after parsing")
-
-	collector, err := collector.NewCollector("ding", nil)
-	check(err, "creating sherpa prometheus collector")
-
-	handler, err := sherpa.NewHandler("/ding/", version, Ding{}, &doc, collector)
-	check(err, "making sherpa handler")
-
-	http.HandleFunc("/", serveAsset)
-	http.HandleFunc("/LICENSES", serveAsset)
-	http.Handle("/ding/", handler)
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/release/", serveRelease)
-	http.HandleFunc("/result/", serveResult)
-	http.HandleFunc("/events", serveEvents)
-
-	go eventMux()
-
 	dingWorkDir, err = os.Getwd()
 	check(err, "getting current work dir")
 
-	newJobs = make(chan job, 1)
-	finishedJobs = make(chan string, 1)
+	if config.IsolateBuilds.Enabled && os.Getuid() != 0 {
+		log.Fatalln(`must run as root when isolateBuilds is enabled`)
+	} else if !config.IsolateBuilds.Enabled && os.Getuid() == 0 {
+		log.Fatalln(`mjust not run as root when isolateBuilds is disabled`)
+	}
+
+	proto := 0
+	// we exchange gob messages with unprivileged httpserver over socketsA
+	socketsA, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM, proto)
+	check(err, "creating socketpair")
+
+	// and we send file descriptors from to unprivileged httpserver after kicking off a build under a unique uid
+	socketsB, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM, proto)
+	check(err, "creating socketpair")
+
+	rootAFD := os.NewFile(uintptr(socketsA[0]), "rootA")
+	httpAFD := os.NewFile(uintptr(socketsA[1]), "httpA")
+	rootBFD := os.NewFile(uintptr(socketsB[0]), "rootB")
+	httpBFD := os.NewFile(uintptr(socketsB[1]), "httpB")
+
+	fileconn, err := net.FileConn(rootBFD)
+	check(err, "fileconn")
+	unixconn, ok := fileconn.(*net.UnixConn)
+	if !ok {
+		log.Fatalln("not unixconn")
+	}
+	check(rootBFD.Close(), "closing root unix fd")
+	rootBFD = nil
+
+	argv := append([]string{os.Args[0], "serve-http"}, os.Args[2:len(os.Args)-1]...)
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.ExtraFiles = []*os.File{httpAFD, httpBFD} // these end up as fd 3 and fd4 in http-serve
+	if config.IsolateBuilds.Enabled {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid:         uint32(config.IsolateBuilds.DingUid),
+				Gid:         uint32(config.IsolateBuilds.DingGid),
+				Groups:      []uint32{},
+				NoSetGroups: false,
+			},
+		}
+	}
+	err = cmd.Start()
+	check(err, "starting http process")
+
+	check(httpAFD.Close(), "closing http fd a")
+	check(httpBFD.Close(), "closing http fd b")
+	httpAFD = nil
+	httpBFD = nil
+
+	dec := gob.NewDecoder(rootAFD)
+	enc := gob.NewEncoder(rootAFD)
+	err = enc.Encode(&config)
+	check(err, "writing config to httpserver")
+	for {
+		var msg msg
+		err := dec.Decode(&msg)
+		check(err, "decoding msg")
+
+		switch msg.Kind {
+		case MsgChown:
+			msgChown(msg, enc)
+		case MsgRemovedir:
+			msgRemovedir(msg, enc)
+		case MsgBuild:
+			msgBuild(msg, enc, unixconn)
+		default:
+			log.Fatalf("unknown msg kind %d\n", msg.Kind)
+		}
+	}
+}
+
+func calcUid(buildId int) int {
+	return config.IsolateBuilds.UidStart + buildId%(config.IsolateBuilds.UidEnd-config.IsolateBuilds.UidStart)
+}
+
+func errstr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func msgChown(msg msg, enc *gob.Encoder) {
+	if !config.IsolateBuilds.Enabled {
+		err := enc.Encode("")
+		check(err, "encoding chown response")
+		return
+	}
+
+	if msg.RepoName == "" {
+		log.Fatal("received MsgChown with empty RepoName")
+	}
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildId)
+
+	uid := calcUid(msg.BuildId)
+
+	chown := func(path string) error {
+		return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// don't change symlinks, we would be modifying whatever they point to!
+			if (info.Mode() & os.ModeSymlink) != 0 {
+				return nil
+			}
+			return os.Chown(path, uid, config.IsolateBuilds.DingGid)
+		})
+	}
+
+	err := chown(buildDir + "/home")
+	if err == nil {
+		err = chown(buildDir + "/checkout")
+	}
+	err = enc.Encode(errstr(err))
+	check(err, "encoding msg")
+}
+
+func msgRemovedir(msg msg, enc *gob.Encoder) {
+	if msg.RepoName == "" {
+		log.Fatal("received MsgRemovedir with empty RepoName")
+	}
+	path := fmt.Sprintf("%s/data/build/%s", dingWorkDir, msg.RepoName)
+	if msg.BuildId > 0 {
+		path += fmt.Sprintf("/%d", msg.BuildId)
+	}
+
+	err := os.RemoveAll(path)
+	err = enc.Encode(errstr(err))
+	check(err, "writing removedir response")
+}
+
+func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
+	outr, outw, err := os.Pipe()
+	check(err, "create stdout pipe")
+	defer outr.Close()
+	defer outw.Close()
+
+	errr, errw, err := os.Pipe()
+	check(err, "create stderr pipe")
+	defer errr.Close()
+	defer errw.Close()
+
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildId)
+	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, msg.CheckoutPath)
+
+	uid := calcUid(msg.BuildId)
+
+	cmd := exec.Command(buildDir + "/scripts/build.sh")
+	cmd.Dir = checkoutDir
+	cmd.Env = msg.Env
+	cmd.Stdout = outw
+	cmd.Stderr = errw
+	cmd.ExtraFiles = []*os.File{}
+	if config.IsolateBuilds.Enabled {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid:         uint32(uid),
+				Gid:         uint32(config.IsolateBuilds.DingGid),
+				Groups:      []uint32{},
+				NoSetGroups: false,
+			},
+		}
+	}
+	err = cmd.Start()
+	if err != nil {
+		log.Println("start failed:", err)
+		enc.Encode(err.Error())
+		return
+	}
+	err = enc.Encode(errstr(err))
+	check(err, "writing build start")
+
+	statusr, statusw, err := os.Pipe()
+	check(err, "create status pipe")
+
+	buf := []byte{1}
+	oob := unix.UnixRights(int(outr.Fd()), int(errr.Fd()), int(statusr.Fd()))
+	_, _, err = unixconn.WriteMsgUnix(buf, oob, nil)
+	defer statusr.Close()
+	if err != nil {
+		statusw.Close()
+		check(err, "sending fds from root to http")
+	}
+
 	go func() {
-		active := map[string]struct{}{}
-		pending := map[string][]job{}
-
-		kick := func(repoName string) {
-			if _, ok := active[repoName]; ok {
-				return
-			}
-			jobs := pending[repoName]
-			if len(jobs) == 0 {
-				return
-			}
-			job := jobs[0]
-			pending[repoName] = jobs[1:]
-			active[repoName] = struct{}{}
-			job.rc <- struct{}{}
-		}
-
-		for {
-			select {
-			case job := <-newJobs:
-				pending[job.repoName] = append(pending[job.repoName], job)
-				kick(job.repoName)
-
-			case repoName := <-finishedJobs:
-				delete(active, repoName)
-				kick(repoName)
-			}
-		}
+		err := cmd.Wait()
+		err = gob.NewEncoder(statusw).Encode(errstr(err))
+		check(err, "writing status to http-serve")
 	}()
-
-	unfinishedMsg := "marked as failed/unfinished at ding startup."
-	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null and status!='new'`, unfinishedMsg)
-	check(err, "marking unfinished builds as failed")
-	rows, err := result.RowsAffected()
-	check(err, "reading affected rows for marking unfinished builds as failed")
-	if rows > 0 {
-		log.Printf("marked %d unfinished builds as failed\n", rows)
-	}
-
-	var buf []byte
-	var newBuilds []struct {
-		Repo  Repo
-		Build Build
-	}
-	qnew := `
-		select coalesce(json_agg(x.*), '[]') from (
-			select row_to_json(repo.*) as repo, row_to_json(build.*) as build from repo join build on repo.id = build.repo_id where status='new'
-		) x
-	`
-	check(database.QueryRow(qnew).Scan(&buf), "fetching new builds from database")
-	check(json.Unmarshal(buf, &newBuilds), "parsing new builds from database")
-	for _, repoBuild := range newBuilds {
-		func(repo Repo, build Build) {
-			job := job{
-				repo.Name,
-				make(chan struct{}),
-			}
-			newJobs <- job
-			go func() {
-				<-job.rc
-				defer func() {
-					finishedJobs <- job.repoName
-				}()
-
-				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
-				_doBuild(repo, build, buildDir)
-			}()
-		}(repoBuild.Repo, repoBuild.Build)
-	}
-
-	if *listenWebhookAddress != "" {
-		log.Printf("ding version %s, listening on %s and for webhooks on %s\n", version, *listenAddress, *listenWebhookAddress)
-		webhookHandler := http.NewServeMux()
-		webhookHandler.HandleFunc("/github/", githubHookHandler)
-		webhookHandler.HandleFunc("/bitbucket/", bitbucketHookHandler)
-		go func() {
-			server := &http.Server{Addr: *listenWebhookAddress, Handler: webhookHandler}
-			log.Fatal(server.ListenAndServe())
-		}()
-	} else {
-		log.Printf("ding version %s, listening on %s\n", version, *listenAddress)
-	}
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
-}
-
-func serveAsset(w http.ResponseWriter, r *http.Request) {
-	if strings.HasSuffix(r.URL.Path, "/") {
-		r.URL.Path += "index.html"
-	}
-	f, err := httpFS.Open(r.URL.Path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			http.NotFound(w, r)
-			return
-		}
-		log.Printf("serving asset %s: %s\n", r.URL.Path, err)
-		http.Error(w, "500 - Server error", 500)
-		return
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		log.Printf("serving asset %s: %s\n", r.URL.Path, err)
-		http.Error(w, "500 - Server error", 500)
-		return
-	}
-
-	if info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	_, haveCacheBuster := r.URL.Query()["v"]
-	cache := "no-cache, max-age=0"
-	if haveCacheBuster {
-		cache = fmt.Sprintf("public, max-age=%d", 31*24*3600)
-	}
-	w.Header().Set("Cache-Control", cache)
-
-	http.ServeContent(w, r, r.URL.Path, info.ModTime(), f)
-}
-
-func serveRelease(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "bad method", 405)
-		return
-	}
-	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, fmt.Sprintf("data/release/%s/%s/%s", t[1], t[2], t[3]))
-}
-
-func serveResult(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "bad method", 405)
-		return
-	}
-	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
-		http.NotFound(w, r)
-		return
-	}
-	repoName := t[1]
-	buildId, err := strconv.Atoi(t[2])
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	basename := t[3]
-
-	fail := func(err error) {
-		log.Printf("error fetching result: %s\n", err)
-		http.Error(w, "internal error", 500)
-	}
-
-	q := `
-		select repo.checkout_path, result.filename
-		from result
-		join build on result.build_id = build.id
-		join repo on build.repo_id = repo.id
-		where repo.name=$1 and build.id=$2
-	`
-	rows, err := database.Query(q, repoName, buildId)
-	if err != nil {
-		fail(err)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var repoCheckoutPath, name string
-		err = rows.Scan(&repoCheckoutPath, &name)
-		if err != nil {
-			fail(err)
-			return
-		}
-		if strings.HasSuffix(name, "/"+basename) {
-			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoCheckoutPath, name)
-			http.ServeFile(w, r, path)
-			return
-		}
-	}
-	if err = rows.Err(); err != nil {
-		fail(err)
-		return
-	}
-	http.NotFound(w, r)
 }

@@ -2,11 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"os"
-	"os/exec"
-	"os/user"
-	"strings"
 )
 
 func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
@@ -22,24 +17,14 @@ func _removeBuild(tx *sql.Tx, repoName string, buildId int) {
 	sherpaCheckRow(tx.QueryRow(q, buildId), &builddirRemoved, "removing build from database")
 
 	if !builddirRemoved {
-		buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repoName, buildId)
-		_removeDir(buildDir)
+		_removeDir(repoName, buildId)
 	}
 }
 
-func _removeDir(path string) {
-	if config.IsolateBuilds.Enabled {
-		user, err := user.Current()
-		sherpaCheck(err, "getting current uid/gid")
-		chownbuild := append(config.IsolateBuilds.ChownBuild, string(user.Uid), string(user.Gid), path)
-		cmd := exec.Command(chownbuild[0], chownbuild[1:]...)
-		buf, err := cmd.CombinedOutput()
-		if err != nil {
-			serverError(fmt.Sprintf("changing user/group ownership of %s: %s: %s", path, err, strings.TrimSpace(string(buf))))
-		}
-	}
-
-	err := os.RemoveAll(path)
+func _removeDir(repoName string, buildId int) {
+	req := request{msg{MsgRemovedir, repoName, buildId, "", nil}, make(chan error, 0), nil}
+	rootRequests <- req
+	err := <-req.errorResponse
 	sherpaCheck(err, "removing files")
 }
 
@@ -47,6 +32,5 @@ func _removeBuilddir(tx *sql.Tx, repoName string, buildId int) {
 	err := tx.QueryRow("update build set builddir_removed=true where id=$1 returning id", buildId).Scan(&buildId)
 	sherpaCheck(err, "marking builddir as removed in database")
 
-	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repoName, buildId)
-	_removeDir(buildDir)
+	_removeDir(repoName, buildId)
 }

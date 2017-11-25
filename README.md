@@ -103,7 +103,6 @@ Now run: "make build test release"
 
 - write test code
 - add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
-- implement privsep, root starting the builds and doing chown. the ding user for webserver, the other build ids for building. then no more setuid and sudo configuration is required.
 - when on a build page, show it if a new build is already in progress, with a link to that new build
 
 ## Maybe
@@ -117,5 +116,5 @@ Now run: "make build test release"
 - provide option to download a .zip or .tgz with all files in a release.
 - more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
-- make this work somewhat on windows?
+- make this work somewhat on windows? hard given the privsep design.
 - add SSE statistics to prometheus metrics?

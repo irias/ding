@@ -1,6 +1,9 @@
 run: build
 	./ding serve local/config.json
 
+run-root: build
+	sudo ./ding serve local/config.json
+
 build:
 	python www-src/build.py
 	go build -i

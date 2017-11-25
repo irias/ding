@@ -3,13 +3,15 @@ package main
 import (
 	"bufio"
 	"database/sql"
+	"encoding/gob"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"time"
+	"bytes"
 
 	"bitbucket.org/mjl/sherpa"
 )
@@ -72,10 +74,6 @@ func prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buil
 	}()
 	repo, build, buildDir = _prepareBuild(repoName, branch, commit)
 	return repo, build, buildDir, nil
-}
-
-func calcUid(buildId int) int {
-	return config.IsolateBuilds.UidStart + buildId%(config.IsolateBuilds.UidEnd-config.IsolateBuilds.UidStart)
 }
 
 func doBuild(repo Repo, build Build, buildDir string) {
@@ -164,13 +162,20 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		return exec.Command(args[0], args[1:]...)
 	}
 
+	runPrefix := func(args ...string) []string {
+		if len(config.Run) > 0 {
+			args = append(config.Run, args...)
+		}
+		return args
+	}
+
 	_updateStatus("clone")
 	var err error
 	switch repo.VCS {
 	case "git":
 		// we clone without hard links because we chown later, don't want to mess up local git source repo's
 		// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-		err = run(build.Id, env, "clone", buildDir, buildDir, "git", "clone", "--recursive", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)
+		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix("git", "clone", "--recursive", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)...)
 		sherpaUserCheck(err, "cloning git repository")
 	case "mercurial":
 		cmd := []string{"hg", "clone", "--branch", build.Branch}
@@ -178,37 +183,16 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			cmd = append(cmd, "--rev", build.CommitHash, "--updaterev", build.CommitHash)
 		}
 		cmd = append(cmd, repo.Origin, "checkout/"+repo.CheckoutPath)
-		err = run(build.Id, env, "clone", buildDir, buildDir, cmd...)
+		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix(cmd...)...)
 		sherpaUserCheck(err, "cloning mercurial repository")
 	case "command":
-		err = run(build.Id, env, "clone", buildDir, buildDir, "sh", "-c", repo.Origin)
+		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix("sh", "-c", repo.Origin)...)
 		sherpaUserCheck(err, "cloning repository from command")
 	default:
 		serverError("unexpected VCS " + repo.VCS)
 	}
 
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, repo.CheckoutPath)
-	if config.IsolateBuilds.Enabled {
-		chownBuild := append(config.IsolateBuilds.ChownBuild, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid), buildDir+"/checkout", buildDir+"/home")
-		cmd := execCommand(chownBuild...)
-		cmd.Dir = buildDir
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			sherpaCheck(err, "setting owner/group on checkout and home directory: "+strings.TrimSpace(string(output)))
-		}
-	}
-
-	// from now on, we run commands under its own uid, if config.IsolateBuilds is on.
-	RUNAS := append(config.IsolateBuilds.Runas, fmt.Sprintf("%d", calcUid(build.Id)), fmt.Sprintf("%d", config.IsolateBuilds.DingGid))
-	runas := func(args ...string) []string {
-		if len(config.Run) > 0 {
-			args = append(config.Run, args...)
-		}
-		if config.IsolateBuilds.Enabled {
-			args = append(RUNAS, args...)
-		}
-		return args
-	}
 
 	if build.CommitHash == "" {
 		if repo.VCS == "command" {
@@ -230,7 +214,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			default:
 				serverError("unexpected VCS " + repo.VCS)
 			}
-			cmd := execCommand(runas(command...)...)
+			cmd := execCommand(runPrefix(command...)...)
 			cmd.Dir = checkoutDir
 			buf, err := cmd.Output()
 			sherpaCheck(err, "finding commit hash")
@@ -247,13 +231,46 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 	}
 
 	if repo.VCS == "git" {
-		err = run(build.Id, env, "clone", buildDir, checkoutDir, runas("git", "checkout", build.CommitHash)...)
+		err = run(build.Id, env, "clone", buildDir, checkoutDir, runPrefix("git", "checkout", build.CommitHash)...)
 		sherpaUserCheck(err, "checkout revision")
 	}
 
+	req := request{
+		msg{MsgChown, repo.Name, build.Id, repo.CheckoutPath, nil},
+		make(chan error, 0),
+		nil,
+	}
+	rootRequests <- req
+	err = <-req.errorResponse
+	sherpaCheck(err, "chown")
+
 	_updateStatus("build")
-	err = run(build.Id, env, "build", buildDir, checkoutDir, runas(buildDir+"/scripts/build.sh")...)
-	sherpaUserCheck(err, "building")
+	req = request{
+		msg{MsgBuild, repo.Name, build.Id, repo.CheckoutPath, env},
+		nil,
+		make(chan buildResult, 0),
+	}
+	rootRequests <- req
+	result := <-req.buildResponse
+	if result.err != nil {
+		sherpaUserCheck(result.err, "building")
+	}
+
+	wait := make(chan error, 1)
+	go func() {
+		defer result.status.Close()
+
+		var r string
+		err = gob.NewDecoder(result.status).Decode(&r)
+		check(err, "decoding gob from result.status")
+		var err error
+		if r != "" {
+			err = fmt.Errorf("%s", r)
+		}
+		wait <- err
+	}()
+	err = track(build.Id, "build", buildDir, result.stdout, result.stderr, wait)
+	sherpaUserCheck(err, "running command")
 
 	transact(func(tx *sql.Tx) {
 		outputDir := buildDir + "/output"
@@ -271,28 +288,6 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 
 		events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
 	})
-}
-
-func fileCopy(src, dst string) {
-	err := os.MkdirAll(path.Dir(dst), 0777)
-	sherpaCheck(err, "making directory for copying result file")
-	sf, err := os.Open(src)
-	sherpaCheck(err, "open result file")
-	defer sf.Close()
-	df, err := os.Create(dst)
-	sherpaCheck(err, "creating destination result file")
-	defer func() {
-		err2 := df.Close()
-		if err == nil {
-			err = err2
-		}
-		if err != nil {
-			os.Remove(dst)
-			sherpaCheck(err, "installing result file")
-		}
-	}()
-	_, err = io.Copy(df, sf)
-	sherpaCheck(err, "copying result file to destination")
 }
 
 func _cleanupBuilds(repoName, branch string) {
@@ -353,69 +348,193 @@ func parseResults(checkoutDir, path string) (results []Result) {
 	return
 }
 
-func run(buildId int, env []string, step, buildDir, workDir string, args ...string) (err error) {
-	events <- eventOutput{buildId, step, "stdout", ""}
+// start a command and return readers for its output and the final result of the command.
+// it mimics a command started through the root process under a unique uid.
+func setupCmd(buildId int, env []string, step, buildDir, workDir string, args ...string) (stdout, stderr io.ReadCloser, wait <-chan error, rerr error) {
+	type Error struct {
+		err error
+	}
 
+	var fd1, fd2 io.ReadCloser
+	defer func() {
+		e := recover()
+		if e == nil {
+			return
+		}
+
+		// on error, must close the fd's, otherwise, they need to be returned, and need to be closed by the caller.
+		if fd1 != nil {
+			fd1.Close()
+		}
+		if fd2 != nil {
+			fd2.Close()
+		}
+		if ee, ok := e.(Error); ok {
+			rerr = ee.err
+			return
+		}
+		panic(e)
+	}()
+
+	xcheck := func(err error, msg string) {
+		if err != nil {
+			panic(Error{fmt.Errorf("%s: %s", msg, err)})
+		}
+	}
+
+	var err error
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = workDir
 	cmd.Env = env
-	var output, stdout, stderr, nsecFile io.WriteCloser
+	fd1, err = cmd.StdoutPipe()
+	xcheck(err, "stdout pipe")
+	fd2, err = cmd.StderrPipe()
+	xcheck(err, "stderr pipe")
+	err = cmd.Start()
+	xcheck(err, "command start")
+
+	c := make(chan error, 1)
+	go func() {
+		c <- cmd.Wait()
+	}()
+	return fd1, fd2, c, nil
+}
+
+func run(buildId int, env []string, step, buildDir, workDir string, args ...string) error {
+	cmdstdout, cmdstderr, wait, err := setupCmd(buildId, env, step, buildDir, workDir, args...)
+	if err != nil {
+		return fmt.Errorf("setting up command: %s", err)
+	}
+	return track(buildId, step, buildDir, cmdstdout, cmdstderr, wait)
+}
+
+func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadCloser, wait <-chan error) (rerr error) {
+	type Error struct {
+		err error
+	}
+
+	defer func() {
+		e := recover()
+		if e == nil {
+			return
+		}
+		if ee, ok := e.(Error); ok {
+			rerr = ee.err
+			return
+		}
+		panic(e)
+	}()
+
+	xcheck := func(err error, msg string) {
+		if err != nil {
+			panic(Error{fmt.Errorf("%s: %s", msg, err)})
+		}
+	}
+
+	defer func() {
+		cmdstdout.Close()
+		cmdstderr.Close()
+	}()
+
+	// write .nsec file when we're done here
 	t0 := time.Now()
 	defer func() {
-		check := func(err2 error) {
-			if err == nil {
-				err = err2
+		time.Now().Sub(t0)
+		nsec, err := os.Create(buildDir + "/output/" + step + ".nsec")
+		xcheck(err, "creating nsec file")
+		defer nsec.Close()
+		_, err = fmt.Fprintf(nsec, "%d", time.Now().Sub(t0))
+		xcheck(err, "writing nsec file")
+	}()
+
+	appendFlags := os.O_APPEND|os.O_CREATE|os.O_WRONLY
+	output, err := os.OpenFile(buildDir + "/output/" + step + ".output", appendFlags, 0644)
+	xcheck(err, "creating output file")
+	defer output.Close()
+	stdout, err := os.OpenFile(buildDir + "/output/" + step + ".stdout", appendFlags, 0644)
+	xcheck(err, "creating stdout file")
+	defer stdout.Close()
+	stderr, err := os.OpenFile(buildDir + "/output/" + step + ".stderr", appendFlags, 0644)
+	xcheck(err, "creating stderr file")
+	defer stderr.Close()
+
+	// let it be known that we started this phase
+	events <- eventOutput{buildId, step, "stdout", ""}
+
+	// first we read all the data from stdout & stderr
+	type Lines struct {
+		text   string
+		stdout bool
+		err error
+	}
+	lines := make(chan Lines, 0)
+	linereader := func(r io.ReadCloser, stdout bool) {
+		buf := make([]byte, 1024)
+		have := 0
+		for {
+			log.Println("calling read")
+			n, err := r.Read(buf[have:])
+			log.Println("read returned")
+			if n > 0 {
+				have += n
+				end := bytes.LastIndexByte(buf[:have], '\n')
+				if end < 0 && have == len(buf) {
+					// cannot gather any more data, flush it
+					end = len(buf)
+				} else if end < 0 {
+					continue
+				} else {
+					// include the newline
+					end += 1
+				}
+				lines <- Lines{string(buf[:end]), stdout, nil}
+				copy(buf[:], buf[end:have])
+				have -= end
+			}
+			if err == io.EOF {
+				lines <- Lines{"", stdout, nil}
+				break
+			}
+			if err != nil {
+				lines <- Lines{stdout: stdout, err: err}
+				return
 			}
 		}
-		if output != nil {
-			check(output.Close())
+	}
+	log.Println("new command, reading input")
+	go linereader(cmdstdout, true)
+	go linereader(cmdstderr, false)
+	eofs := 0
+	for {
+		l := <-lines
+		log.Println("have line", l)
+		if l.text == "" || l.err != nil {
+			if l.err != nil {
+				log.Println("reading output from command:", l.err)
+			}
+			eofs += 1
+			if eofs >= 2 {
+				log.Println("done with command output")
+				break
+			}
+			continue
 		}
-		if stdout != nil {
-			check(stdout.Close())
+		_, err = output.Write([]byte(l.text))
+		xcheck(err, "writing to output")
+		var where string
+		if l.stdout {
+			where = "stdout"
+			_, err = stdout.Write([]byte(l.text))
+			xcheck(err, "writing to stdout")
+		} else {
+			where = "stderr"
+			_, err = stderr.Write([]byte(l.text))
+			xcheck(err, "writing to stderr")
 		}
-		if stderr != nil {
-			check(stderr.Close())
-		}
-
-		if nsecFile != nil {
-			_, err2 := fmt.Fprintf(nsecFile, "%d", time.Now().Sub(t0))
-			check(err2)
-		}
-	}()
-	if output, err = os.Create(buildDir + "/output/" + step + ".output"); err != nil {
-		return fmt.Errorf("creating combined output file: %s", err)
-	}
-	output = LineWriter(output, "", "", -1)
-	if stdout, err = os.Create(buildDir + "/output/" + step + ".stdout"); err != nil {
-		return fmt.Errorf("creating stdout file: %s", err)
-	}
-	stdout = LineWriter(stdout, step, "stdout", buildId)
-	cmd.Stdout = io.MultiWriter(stdout, output)
-
-	if stderr, err = os.Create(buildDir + "/output/" + step + ".stderr"); err != nil {
-		return fmt.Errorf("opening stderr file: %s", err)
-	}
-	stderr = LineWriter(stderr, step, "stderr", buildId)
-	cmd.Stderr = io.MultiWriter(stderr, output)
-
-	if nsecFile, err = os.Create(buildDir + "/output/" + step + ".nsec"); err != nil {
-		return fmt.Errorf("opening nsec file: %s", err)
+		events <- eventOutput{buildId, step, where, l.text}
 	}
 
-	if err = cmd.Run(); err != nil {
-		return fmt.Errorf("workdir %s, command %s: %s", workDir, strings.Join(args, " "), err)
-	}
-	if err = output.Close(); err != nil {
-		return err
-	}
-	output = nil
-	if err = stdout.Close(); err != nil {
-		return err
-	}
-	stdout = nil
-	if err = stderr.Close(); err != nil {
-		return err
-	}
-	stderr = nil
-	return nil
+	// second, we wait for the command result
+	xcheck(<-wait, "command failed")
+	return
 }
