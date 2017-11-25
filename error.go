@@ -57,7 +57,7 @@ func sherpaUserCheck(err error, msg string) {
 		m += ": "
 	}
 	m += err.Error()
-	if config.PrintSherpaErrorStack {
+	if false && config.PrintSherpaErrorStack {
 		log.Println("sherpa userError:", m)
 		debug.PrintStack()
 	}
