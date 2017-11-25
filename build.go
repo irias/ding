@@ -432,8 +432,6 @@ func run(buildId int, env []string, step, buildDir, workDir string, args ...stri
 	return track(buildId, step, buildDir, cmdstdout, cmdstderr, wait)
 }
 
-// todo xxx: fix problem that makes reading output from the passed fd's hang when running with privsep enabled on macos and running with uids that don't have an entry in /etc/passwd.
-// reading from the fd's only hangs on macos (not linux or openbsd), and only when the build process is running under a uid that doesn't exist in /etc/passwd (with "isolate builds" disabled it works, with uidStart-uidEnd an existing user it works as well).
 func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadCloser, wait <-chan error) (rerr error) {
 	type Error struct {
 		err error
