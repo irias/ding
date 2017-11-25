@@ -22,9 +22,8 @@
 					<th>Status</th>
 					<td>
 						<build-status status="build.status" finish="build.finish" released="build.released"></build-status>
-						<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap; margin-bottom: 2rem">{{ build.last_line }}
-	{{ build.error_message }}</div>
-
+						<div ng-if="build.finish && build.status !== 'success'" style="white-space: pre-wrap">{{ build.last_line }}
+{{ build.error_message }}</div>
 					</td>
 				</tr>
 				<tr>
