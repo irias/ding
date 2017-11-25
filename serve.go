@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 
@@ -74,12 +73,17 @@ func serve(args []string) {
 	rootBFD = nil
 
 	argv := append([]string{os.Args[0], "serve-http"}, os.Args[2:len(os.Args)-1]...)
-	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.ExtraFiles = []*os.File{httpAFD, httpBFD} // these end up as fd 3 and fd4 in http-serve
+	attr := &os.ProcAttr{
+		Files: []*os.File{
+			os.Stdin,
+			os.Stdout,
+			os.Stderr,
+			httpAFD,
+			httpBFD,
+		},
+	}
 	if config.IsolateBuilds.Enabled {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
+		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
 				Uid:         uint32(config.IsolateBuilds.DingUid),
 				Gid:         uint32(config.IsolateBuilds.DingGid),
@@ -88,7 +92,7 @@ func serve(args []string) {
 			},
 		}
 	}
-	err = cmd.Start()
+	_, err = os.StartProcess(argv[0], argv, attr)
 	check(err, "starting http process")
 
 	check(httpAFD.Close(), "closing http fd a")
@@ -195,14 +199,22 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 
 	uid := calcUid(msg.BuildId)
 
-	cmd := exec.Command(buildDir + "/scripts/build.sh")
-	cmd.Dir = checkoutDir
-	cmd.Env = msg.Env
-	cmd.Stdout = outw
-	cmd.Stderr = errw
-	cmd.ExtraFiles = []*os.File{}
+	devnull, err := os.Open("/dev/null")
+	check(err, "opening /dev/null")
+	defer devnull.Close()
+
+	argv := []string{buildDir + "/scripts/build.sh"}
+	attr := &os.ProcAttr{
+		Dir: checkoutDir,
+		Env: msg.Env,
+		Files: []*os.File{
+			devnull,
+			outw,
+			errw,
+		},
+	}
 	if config.IsolateBuilds.Enabled {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
+		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
 				Uid:         uint32(uid),
 				Gid:         uint32(config.IsolateBuilds.DingGid),
@@ -211,7 +223,7 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 			},
 		}
 	}
-	err = cmd.Start()
+	proc, err := os.StartProcess(argv[0], argv, attr)
 	if err != nil {
 		log.Println("start failed:", err)
 		enc.Encode(err.Error())
@@ -233,7 +245,10 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 	}
 
 	go func() {
-		err := cmd.Wait()
+		state, err := proc.Wait()
+		if err == nil && !state.Success() {
+			err = fmt.Errorf(state.String())
+		}
 		err = gob.NewEncoder(statusw).Encode(errstr(err))
 		check(err, "writing status to http-serve")
 	}()

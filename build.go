@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"database/sql"
 	"encoding/gob"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-	"bytes"
 
 	"bitbucket.org/mjl/sherpa"
 )
@@ -133,7 +133,9 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		}
 
 		if r != nil {
-			panic(r)
+			if serr, ok := r.(*sherpa.Error); !ok || serr.Code != "userError" {
+				panic(r)
+			}
 		}
 	}()
 
@@ -355,21 +357,28 @@ func setupCmd(buildId int, env []string, step, buildDir, workDir string, args ..
 		err error
 	}
 
-	var fd1, fd2 io.ReadCloser
+	var devnull, stdoutr, stdoutw, stderrr, stderrw *os.File
 	defer func() {
+		close := func(f *os.File) {
+			if f != nil {
+				f.Close()
+			}
+		}
+		// always close subprocess-part of the fd's
+		close(devnull)
+		close(stdoutw)
+		close(stderrw)
+
 		e := recover()
 		if e == nil {
 			return
 		}
 
-		// on error, must close the fd's, otherwise, they need to be returned, and need to be closed by the caller.
-		if fd1 != nil {
-			fd1.Close()
-		}
-		if fd2 != nil {
-			fd2.Close()
-		}
 		if ee, ok := e.(Error); ok {
+			// only close returning fd's on error
+			close(stdoutr)
+			close(stderrr)
+
 			rerr = ee.err
 			return
 		}
@@ -383,21 +392,36 @@ func setupCmd(buildId int, env []string, step, buildDir, workDir string, args ..
 	}
 
 	var err error
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = workDir
-	cmd.Env = env
-	fd1, err = cmd.StdoutPipe()
-	xcheck(err, "stdout pipe")
-	fd2, err = cmd.StderrPipe()
-	xcheck(err, "stderr pipe")
-	err = cmd.Start()
+	devnull, err = os.Open("/dev/null")
+	xcheck(err, "open /dev/null")
+
+	stdoutr, stdoutw, err = os.Pipe()
+	xcheck(err, "pipe for stdout")
+
+	stderrr, stderrw, err = os.Pipe()
+	xcheck(err, "pipe for stderr")
+
+	attr := &os.ProcAttr{
+		Dir: workDir,
+		Env: env,
+		Files: []*os.File{
+			devnull,
+			stdoutw,
+			stderrw,
+		},
+	}
+	proc, err := os.StartProcess(args[0], args, attr)
 	xcheck(err, "command start")
 
 	c := make(chan error, 1)
 	go func() {
-		c <- cmd.Wait()
+		state, err := proc.Wait()
+		if err == nil && !state.Success() {
+			err = fmt.Errorf(state.String())
+		}
+		c <- err
 	}()
-	return fd1, fd2, c, nil
+	return stdoutr, stderrr, c, nil
 }
 
 func run(buildId int, env []string, step, buildDir, workDir string, args ...string) error {
@@ -408,6 +432,8 @@ func run(buildId int, env []string, step, buildDir, workDir string, args ...stri
 	return track(buildId, step, buildDir, cmdstdout, cmdstderr, wait)
 }
 
+// todo xxx: fix problem that makes reading output from the passed fd's hang when running with privsep enabled on macos and running with uids that don't have an entry in /etc/passwd.
+// reading from the fd's only hangs on macos (not linux or openbsd), and only when the build process is running under a uid that doesn't exist in /etc/passwd (with "isolate builds" disabled it works, with uidStart-uidEnd an existing user it works as well).
 func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadCloser, wait <-chan error) (rerr error) {
 	type Error struct {
 		err error
@@ -447,14 +473,14 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 		xcheck(err, "writing nsec file")
 	}()
 
-	appendFlags := os.O_APPEND|os.O_CREATE|os.O_WRONLY
-	output, err := os.OpenFile(buildDir + "/output/" + step + ".output", appendFlags, 0644)
+	appendFlags := os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	output, err := os.OpenFile(buildDir+"/output/"+step+".output", appendFlags, 0644)
 	xcheck(err, "creating output file")
 	defer output.Close()
-	stdout, err := os.OpenFile(buildDir + "/output/" + step + ".stdout", appendFlags, 0644)
+	stdout, err := os.OpenFile(buildDir+"/output/"+step+".stdout", appendFlags, 0644)
 	xcheck(err, "creating stdout file")
 	defer stdout.Close()
-	stderr, err := os.OpenFile(buildDir + "/output/" + step + ".stderr", appendFlags, 0644)
+	stderr, err := os.OpenFile(buildDir+"/output/"+step+".stderr", appendFlags, 0644)
 	xcheck(err, "creating stderr file")
 	defer stderr.Close()
 
@@ -465,16 +491,16 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 	type Lines struct {
 		text   string
 		stdout bool
-		err error
+		err    error
 	}
 	lines := make(chan Lines, 0)
 	linereader := func(r io.ReadCloser, stdout bool) {
 		buf := make([]byte, 1024)
 		have := 0
 		for {
-			log.Println("calling read")
+			//log.Println("calling read")
 			n, err := r.Read(buf[have:])
-			log.Println("read returned")
+			//log.Println("read returned")
 			if n > 0 {
 				have += n
 				end := bytes.LastIndexByte(buf[:have], '\n')
@@ -501,20 +527,20 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 			}
 		}
 	}
-	log.Println("new command, reading input")
+	//log.Println("new command, reading input")
 	go linereader(cmdstdout, true)
 	go linereader(cmdstderr, false)
 	eofs := 0
 	for {
 		l := <-lines
-		log.Println("have line", l)
+		//log.Println("have line", l)
 		if l.text == "" || l.err != nil {
 			if l.err != nil {
 				log.Println("reading output from command:", l.err)
 			}
 			eofs += 1
 			if eofs >= 2 {
-				log.Println("done with command output")
+				//log.Println("done with command output")
 				break
 			}
 			continue

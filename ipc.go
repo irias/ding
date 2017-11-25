@@ -19,7 +19,7 @@ type msgKind int
 const (
 	MsgChown     = msgKind(iota) // chown the homedir & checkoutdir of a build
 	MsgRemovedir                 // remove a builddir, or (if buildId < 0), an entire repo
-	MsgBuild                       // start a build by running build.sh
+	MsgBuild                     // start a build by running build.sh
 )
 
 // request from one of the http handlers to httpserve's request mux
