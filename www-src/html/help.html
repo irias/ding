@@ -11,20 +11,20 @@
 		</ul>
 
 		<h3>Repositories</h3>
-		<p>Ding assumes a software project is in a version control system. Ding currently only supports git. On each build, ding clones the git repository. Per ding repository, you need to configure a shell script <tt>build.sh</tt>. It must compile the software, run tests, create releasable results.</p>
+		<p>Ding assumes a software project is in a version control system. On each build, ding clones the repository. Per ding repository, you need to configure a shell script <tt>build.sh</tt>. It must compile the software, run tests, create releasable results.</p>
 		<p>A repository exists so you can create execute <em>builds</em>.</p>
 
 		<h3>Builds</h3>
 		<p>A build is an attempt to compile the software and create releasable results. A build runs through (hopefully all) of the following steps:</p>
 
 		<h4>new</h4>
-		<p>Waiting to be started: we only run 1 concurrent build per repository, regardless of branch.</p>
+		<p>Waiting to be started: we only run 1 concurrent build per repository, regardless of branch, to prevent access to a database, for example.</p>
 
 		<h4>clone</h4>
-		<p>Fetching source code. Ding calls the external programs git, or hg (for mercurial). If you specify <tt>origin</tt> URLs that make use of SSH, you will probably also need to install ssh keys in $HOME/.ssh for the unix user Ding is running under. In that case, make sure sure the private key file is only accessible by the user (not group) ding is running under.</p>
+		<p>Fetching source code. Ding calls the external programs git or hg or runs the code-fetching shell script. If you specify <tt>origin</tt> URLs that make use of SSH, you will probably also need to install ssh keys in $HOME/.ssh for the unix user Ding is running under. In that case, make sure sure the private key file is only accessible by the user (not group, permission 0400) ding is running under.</p>
 
 		<h4>build</h4>
-		<p>Executes your build.sh script. If you need resources such as a database, you could configure that before hand. Ding always runs at most 1 concurrent build per repository, so builds won't overwrite each other's data during a build. If you want to keep data in the database after a build is finished, you currently have two options: 1. Make a backup/dump of the database. 2. Dynamically create a database as part of the build script.</p>
+		<p>Executes your build.sh script. If you need resources such as a database, you should configure them beforehand. Ding always runs at most 1 concurrent build per repository, so builds won't overwrite each other's data during a build. If you want to keep data in the database after a build is finished, you have two options: 1. Make a backup/dump of the database. 2. Dynamically create a database as part of the build script.</p>
 
 		<h4>success</h4>
 		<p>Successful builds should have results that can be released.</p>
@@ -43,8 +43,8 @@
 		<h2>API</h2>
 		<p>Ding has an API at <a href="/ding/">/ding/</a>.</p>
 
-		<h2>Example build.sh scripts</h2>
-		<p>Build scripts will vary over projects. Nevertheless, some examples for inspiration:</p>
+		<h2 id="examples">Example build.sh scripts</h2>
+		<p>Build scripts will vary over projects. Nevertheless, some examples for inspiration.</p>
 
 		<h3>Ding, written in Go</h3>
 		<p>For Go projects, it is helpful to have them checked out in a path that starts with <tt>src/</tt>, so you can easily configure a private $GOPATH. This assumes you've configured $TOOLCHAINS through Ding's config.json, and extracted the Go version of your choice under $TOOLCHAINS/go.</p>
@@ -55,13 +55,13 @@ set -e
 export GOPATH=$BUILDDIR/checkout
 export PATH=$PATH:$TOOLCHAINS/go/bin:$GOPATH/bin
 
-mkdir local &&
-cat &gt;local/config-test.json &lt;&lt;EOF &&
+mkdir local
+cat &gt;local/config-test.json &lt;&lt;EOF
 ... a config as shown in INSTALL.md ...
 EOF
 
-(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install) &&
-mkdir -p node_modules/.bin && ln -s $(which jshint) node_modules/.bin/ &&
+(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
+mkdir -p node_modules/.bin && ln -s $(which jshint) node_modules/.bin/
 make build test release</pre>
 
 		<h3>Sherpa-servlet-example, written in Java</h3>

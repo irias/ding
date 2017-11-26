@@ -129,6 +129,7 @@ For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
 
 You obviously need a Go compiler.
 But you'll also need:
+- to install the sherpadoc tool: (cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
 - python (v2) to build the frontend files
 - jshint through npm and nodejs to check the JavaScript code: mkdir -p node_modules/.bin && npm install jshint@2.9.5
 - sass through gem and ruby to create CSS files
