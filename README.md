@@ -1,4 +1,4 @@
-# Ding - self-hosted build server for developers
+# Ding - simple secure self-hosted build server for developers
 
 Ding builds your software projects from git/mercurial/etc repositories,
 can run tests and keep track of released software.
@@ -8,7 +8,7 @@ can run tests and keep track of released software.
 
 
 You will typically configure a "post-receive" (web)hook on your git
-server to tell ding to start a build.
+server to tell Ding to start a build.
 
 Ding will start the compile, run tests, and make resulting
 binaries/files.  Successful results can be promoted to a release.
@@ -50,9 +50,11 @@ Get the latest version at https://github.com/irias/ding/releases/latest
 - Self-hosted build server. Keep control over your code and builds!
 - Simple. Get started quickly, experience the power of simplicity,
 use your existing skills, avoid the burden of complex systems.
-- Isolated builds, each build starts under its own unix user id:
-extremely fast, and builds can't interfere with each other.
+- Secure, with isolated builds, each build starts under its own
+unix user id: extremely fast, and builds can't interfere with each
+other.
 - (Web) API for all functionality (what the html5/js frontend is using).
+- Runs on unix systems (Linux, BSD's).
 
 
 # Non-features
@@ -81,8 +83,43 @@ Ding is released under an MIT license. See LICENSE.md.
 
 # FAQ
 
-#### Q: Why are there no questions here?
-Because you didn't ask them yet. Let us know your questions! Please?
+#### Q: Why yet another build server? There are so many already.
+
+Several reasons:
+- Some existing tools are too complicated. They try to be everything
+to everyone. This makes it hard to get started. Hard to do simple
+things. You have to invest a lot of time to learn how to use their
+plugin systems, or their configuration/scripting languages. Ding
+is for developers who know how to write a shell script and don't
+need more hand-holding.
+- This build server works securely on different unixes. Many "modern"
+build servers depend on docker, making them Linux-only. Ding also
+works on BSD's.
+- Finally, it's fun creating software like this.
+
+#### Q: Does Ding have its own website?
+
+No.
+
+#### Q:  Where is the documentation?
+
+- The README you are reading right now.
+- [INSTALL.md](INSTALL.md) with installation instructions, also
+available with "ding help".
+- Documentation behind the "Help" button in the top-right corner
+in Ding.
+- API documentation at /ding/ when you've started Ding.
+
+#### Q: What does "Ding" mean?
+
+Ding is named after the dent in a surfboard. It needs to be repaired,
+or the board will soak up water and become useless or break. Likewise,
+broken software builds need to be repaired soon, or the quality of
+your software goes down.
+
+#### Q: I have another question.
+
+That's not a question. But please do send the actual question in.
 
 
 For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
@@ -92,6 +129,7 @@ For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
 
 You obviously need a Go compiler.
 But you'll also need:
+- to install the sherpadoc tool: (cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
 - python (v2) to build the frontend files
 - jshint through npm and nodejs to check the JavaScript code: mkdir -p node_modules/.bin && npm install jshint@2.9.5
 - sass through gem and ruby to create CSS files
@@ -103,7 +141,6 @@ Now run: "make build test release"
 
 - write test code
 - add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
-- implement privsep, root starting the builds and doing chown. the ding user for webserver, the other build ids for building. then no more setuid and sudo configuration is required.
 - when on a build page, show it if a new build is already in progress, with a link to that new build
 
 ## Maybe
@@ -117,5 +154,5 @@ Now run: "make build test release"
 - provide option to download a .zip or .tgz with all files in a release.
 - more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
-- make this work somewhat on windows?
+- make this work somewhat on windows? hard given the privsep design.
 - add SSE statistics to prometheus metrics?
