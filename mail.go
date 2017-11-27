@@ -5,7 +5,7 @@ import (
 )
 
 func _sendMailFailing(repo Repo, build Build, errmsg string) {
-	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.ID)
 	subject := fmt.Sprintf("ding: failure: repo %s branch %s failing", repo.Name, build.Branch)
 	textMsg := fmt.Sprintf(`Hi!
 
@@ -28,7 +28,7 @@ Ding
 }
 
 func _sendMailFixed(repo Repo, build Build) {
-	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.Id)
+	link := fmt.Sprintf("%s/#/repo/%s/build/%d/", config.BaseURL, repo.Name, build.ID)
 	subject := fmt.Sprintf("ding: resolved: repo %s branch %s is building again", repo.Name, build.Branch)
 	textMsg := fmt.Sprintf(`Hi!
 

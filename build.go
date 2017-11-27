@@ -21,9 +21,9 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		repo = _repo(tx, repoName)
 
 		q := `insert into build (repo_id, branch, commit_hash, status, start) values ($1, $2, $3, $4, NOW()) returning id`
-		sherpaCheckRow(tx.QueryRow(q, repo.Id, branch, commit, "new"), &build.Id, "inserting new build into database")
+		sherpaCheckRow(tx.QueryRow(q, repo.ID, branch, commit, "new"), &build.ID, "inserting new build into database")
 
-		buildDir = fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
+		buildDir = fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.ID)
 		err := os.MkdirAll(buildDir, 0777)
 		sherpaCheck(err, "creating build dir")
 
@@ -41,9 +41,9 @@ func _prepareBuild(repoName, branch, commit string) (repo Repo, build Build, bui
 		err = os.MkdirAll(outputDir, 0777)
 		sherpaCheck(err, "creating output dir")
 
-		build = _build(tx, repo.Name, build.Id)
+		build = _build(tx, repo.Name, build.ID)
 	})
-	events <- eventBuild{repo.Name, build}
+	events <- EventBuild{repo.Name, build}
 	return
 }
 
@@ -60,7 +60,7 @@ func writeFile(path, content string) {
 
 func prepareBuild(repoName, branch, commit string) (repo Repo, build Build, buildDir string, err error) {
 	if branch == "" {
-		err = fmt.Errorf("Branch cannot be empty.")
+		err = fmt.Errorf("branch cannot be empty")
 		return
 	}
 	defer func() {
@@ -92,9 +92,9 @@ func doBuild(repo Repo, build Build, buildDir string) {
 func _doBuild(repo Repo, build Build, buildDir string) {
 	defer func() {
 		transact(func(tx *sql.Tx) {
-			_, err := tx.Exec("update build set finish=NOW() where id=$1 and finish is null", build.Id)
+			_, err := tx.Exec("update build set finish=NOW() where id=$1 and finish is null", build.ID)
 			sherpaCheck(err, "marking build as finished in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
+			events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 		})
 
 		_cleanupBuilds(repo.Name, build.Branch)
@@ -103,9 +103,9 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		if r != nil {
 			if serr, ok := r.(*sherpa.Error); ok && serr.Code == "userError" {
 				transact(func(tx *sql.Tx) {
-					err := tx.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.Id).Scan(&build.Id)
+					err := tx.QueryRow(`update build set error_message=$1 where id=$2 returning id`, serr.Message, build.ID).Scan(&build.ID)
 					sherpaCheck(err, "updating error message in database")
-					events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
+					events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 				})
 			}
 		}
@@ -116,7 +116,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 
 			// for build.LastLine
 			transact(func(tx *sql.Tx) {
-				build = _build(tx, repo.Name, build.Id)
+				build = _build(tx, repo.Name, build.ID)
 			})
 			fillBuild(repo.Name, &build)
 
@@ -141,9 +141,9 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 
 	_updateStatus := func(status string) {
 		transact(func(tx *sql.Tx) {
-			_, err := tx.Exec("update build set status=$1 where id=$2", status, build.Id)
+			_, err := tx.Exec("update build set status=$1 where id=$2", status, build.ID)
 			sherpaCheck(err, "updating build status in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
+			events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 		})
 	}
 
@@ -151,7 +151,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		"BUILDDIR=" + buildDir,
 		"CHECKOUTPATH=" + repo.CheckoutPath,
 		fmt.Sprintf("HOME=%s/home", buildDir),
-		fmt.Sprintf("BUILDID=%d", build.Id),
+		fmt.Sprintf("BUILDID=%d", build.ID),
 		"REPONAME=" + repo.Name,
 		"BRANCH=" + build.Branch,
 		"COMMIT=" + build.CommitHash,
@@ -177,7 +177,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 	case "git":
 		// we clone without hard links because we chown later, don't want to mess up local git source repo's
 		// we have to clone as the user running ding. otherwise, git clone won't work due to ssh refusing to run as a user without a username ("No user exists for uid ...")
-		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix("git", "clone", "--recursive", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)...)
+		err = run(build.ID, env, "clone", buildDir, buildDir, runPrefix("git", "clone", "--recursive", "--no-hardlinks", "--branch", build.Branch, repo.Origin, "checkout/"+repo.CheckoutPath)...)
 		sherpaUserCheck(err, "cloning git repository")
 	case "mercurial":
 		cmd := []string{"hg", "clone", "--branch", build.Branch}
@@ -185,10 +185,10 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			cmd = append(cmd, "--rev", build.CommitHash, "--updaterev", build.CommitHash)
 		}
 		cmd = append(cmd, repo.Origin, "checkout/"+repo.CheckoutPath)
-		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix(cmd...)...)
+		err = run(build.ID, env, "clone", buildDir, buildDir, runPrefix(cmd...)...)
 		sherpaUserCheck(err, "cloning mercurial repository")
 	case "command":
-		err = run(build.Id, env, "clone", buildDir, buildDir, runPrefix("sh", "-c", repo.Origin)...)
+		err = run(build.ID, env, "clone", buildDir, buildDir, runPrefix("sh", "-c", repo.Origin)...)
 		sherpaUserCheck(err, "cloning repository from command")
 	default:
 		serverError("unexpected VCS " + repo.VCS)
@@ -226,19 +226,19 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			sherpaCheck(fmt.Errorf("cannot find commit hash"), "finding commit hash")
 		}
 		transact(func(tx *sql.Tx) {
-			err = tx.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.Id).Scan(&build.Id)
+			err = tx.QueryRow(`update build set commit_hash=$1 where id=$2 returning id`, build.CommitHash, build.ID).Scan(&build.ID)
 			sherpaCheck(err, "updating commit hash in database")
-			events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
+			events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 		})
 	}
 
 	if repo.VCS == "git" {
-		err = run(build.Id, env, "clone", buildDir, checkoutDir, runPrefix("git", "checkout", build.CommitHash)...)
+		err = run(build.ID, env, "clone", buildDir, checkoutDir, runPrefix("git", "checkout", build.CommitHash)...)
 		sherpaUserCheck(err, "checkout revision")
 	}
 
 	req := request{
-		msg{MsgChown, repo.Name, build.Id, repo.CheckoutPath, nil},
+		msg{msgChown, repo.Name, build.ID, repo.CheckoutPath, nil},
 		make(chan error, 0),
 		nil,
 	}
@@ -248,7 +248,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 
 	_updateStatus("build")
 	req = request{
-		msg{MsgBuild, repo.Name, build.Id, repo.CheckoutPath, env},
+		msg{msgBuild, repo.Name, build.ID, repo.CheckoutPath, env},
 		nil,
 		make(chan buildResult, 0),
 	}
@@ -271,7 +271,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		}
 		wait <- err
 	}()
-	err = track(build.Id, "build", buildDir, result.stdout, result.stderr, wait)
+	err = track(build.ID, "build", buildDir, result.stdout, result.stderr, wait)
 	sherpaUserCheck(err, "running command")
 
 	transact(func(tx *sql.Tx) {
@@ -281,14 +281,14 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 		qins := `insert into result (build_id, command, version, os, arch, toolchain, filename, filesize) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 		for _, result := range results {
 			var id int
-			err = tx.QueryRow(qins, build.Id, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, result.Filename, result.Filesize).Scan(&id)
+			err = tx.QueryRow(qins, build.ID, result.Command, result.Version, result.Os, result.Arch, result.Toolchain, result.Filename, result.Filesize).Scan(&id)
 			sherpaCheck(err, "inserting result into database")
 		}
 
-		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.Id)
+		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.ID)
 		sherpaCheck(err, "marking build as success in database")
 
-		events <- eventBuild{repo.Name, _build(tx, repo.Name, build.Id)}
+		events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 	})
 }
 
@@ -310,9 +310,9 @@ func _cleanupBuilds(repoName, branch string) {
 		}
 		if index >= 10 || (b.Finish != nil && now.Sub(*b.Finish) > 14*24*3600*time.Second) {
 			transact(func(tx *sql.Tx) {
-				_removeBuild(tx, repoName, b.Id)
+				_removeBuild(tx, repoName, b.ID)
 			})
-			events <- eventRemoveBuild{repoName, b.Id}
+			events <- EventRemoveBuild{repoName, b.ID}
 		}
 	}
 }
@@ -352,7 +352,7 @@ func parseResults(checkoutDir, path string) (results []Result) {
 
 // start a command and return readers for its output and the final result of the command.
 // it mimics a command started through the root process under a unique uid.
-func setupCmd(buildId int, env []string, step, buildDir, workDir string, args ...string) (stdout, stderr io.ReadCloser, wait <-chan error, rerr error) {
+func setupCmd(buildID int, env []string, step, buildDir, workDir string, args ...string) (stdout, stderr io.ReadCloser, wait <-chan error, rerr error) {
 	type Error struct {
 		err error
 	}
@@ -424,15 +424,15 @@ func setupCmd(buildId int, env []string, step, buildDir, workDir string, args ..
 	return stdoutr, stderrr, c, nil
 }
 
-func run(buildId int, env []string, step, buildDir, workDir string, args ...string) error {
-	cmdstdout, cmdstderr, wait, err := setupCmd(buildId, env, step, buildDir, workDir, args...)
+func run(buildID int, env []string, step, buildDir, workDir string, args ...string) error {
+	cmdstdout, cmdstderr, wait, err := setupCmd(buildID, env, step, buildDir, workDir, args...)
 	if err != nil {
 		return fmt.Errorf("setting up command: %s", err)
 	}
-	return track(buildId, step, buildDir, cmdstdout, cmdstderr, wait)
+	return track(buildID, step, buildDir, cmdstdout, cmdstderr, wait)
 }
 
-func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadCloser, wait <-chan error) (rerr error) {
+func track(buildID int, step, buildDir string, cmdstdout, cmdstderr io.ReadCloser, wait <-chan error) (rerr error) {
 	type Error struct {
 		err error
 	}
@@ -483,7 +483,7 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 	defer stderr.Close()
 
 	// let it be known that we started this phase
-	events <- eventOutput{buildId, step, "stdout", ""}
+	events <- EventOutput{buildID, step, "stdout", ""}
 
 	// first we read all the data from stdout & stderr
 	type Lines struct {
@@ -509,7 +509,7 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 					continue
 				} else {
 					// include the newline
-					end += 1
+					end++
 				}
 				lines <- Lines{string(buf[:end]), stdout, nil}
 				copy(buf[:], buf[end:have])
@@ -536,7 +536,7 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 			if l.err != nil {
 				log.Println("reading output from command:", l.err)
 			}
-			eofs += 1
+			eofs++
 			if eofs >= 2 {
 				//log.Println("done with command output")
 				break
@@ -555,7 +555,7 @@ func track(buildId int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 			_, err = stderr.Write([]byte(l.text))
 			xcheck(err, "writing to stderr")
 		}
-		events <- eventOutput{buildId, step, where, l.text}
+		events <- EventOutput{buildID, step, where, l.text}
 	}
 
 	// second, we wait for the command result

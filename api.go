@@ -27,7 +27,7 @@ type Ding struct {
 	SSE SSE `sherpa:"Server-Sent Events"`
 }
 
-// Checks program status.
+// Status checks the health of the application.
 // If backend connectivity is broken, this sherpa call results in a 500 internal server error. Useful for monitoring tools.
 func (Ding) Status() {
 	type what int
@@ -131,7 +131,7 @@ func _build(tx *sql.Tx, repoName string, id int) (b Build) {
 	return
 }
 
-// Build a specific commit in the background, returning immediately.
+// CreateBuild builds a specific commit in the background, returning immediately.
 // `Commit` can be empty, in which case the origin is cloned and the checked out commit is looked up.
 func (Ding) CreateBuild(repoName, branch, commit string) Build {
 	if branch == "" {
@@ -160,12 +160,12 @@ func toJSON(v interface{}) string {
 	return string(buf)
 }
 
-// Release a build.
-func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
+// CreateRelease release a build.
+func (Ding) CreateRelease(repoName string, buildID int) (build Build) {
 	transact(func(tx *sql.Tx) {
 		repo := _repo(tx, repoName)
 
-		build = _build(tx, repo.Name, buildId)
+		build = _build(tx, repo.Name, buildID)
 		if build.Finish == nil {
 			panic(&sherpa.Error{Code: "userError", Message: "Build has not finished yet"})
 		}
@@ -177,22 +177,22 @@ func (Ding) CreateRelease(repoName string, buildId int) (build Build) {
 		steps := toJSON(br.Steps)
 
 		qrel := `insert into release (build_id, time, build_script, steps) values ($1, now(), $2, $3::json) returning build_id`
-		err := tx.QueryRow(qrel, build.Id, br.BuildScript, steps).Scan(&build.Id)
+		err := tx.QueryRow(qrel, build.ID, br.BuildScript, steps).Scan(&build.ID)
 		sherpaCheck(err, "inserting release into database")
 
 		qup := `update build set released=now() where id=$1 returning id`
-		err = tx.QueryRow(qup, build.Id).Scan(&build.Id)
+		err = tx.QueryRow(qup, build.ID).Scan(&build.ID)
 		sherpaCheck(err, "marking build as released in database")
 
 		var filenames []string
 		q := `select coalesce(json_agg(result.filename), '[]') from result where build_id=$1`
-		sherpaCheckRow(tx.QueryRow(q, build.Id), &filenames, "fetching build results from database")
-		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repo.Name, build.Id, repo.CheckoutPath)
+		sherpaCheckRow(tx.QueryRow(q, build.ID), &filenames, "fetching build results from database")
+		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repo.Name, build.ID, repo.CheckoutPath)
 		for _, filename := range filenames {
-			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repo.Name, build.Id, path.Base(filename)))
+			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repo.Name, build.ID, path.Base(filename)))
 		}
 
-		events <- eventBuild{repo.Name, _build(tx, repo.Name, buildId)}
+		events <- EventBuild{repo.Name, _build(tx, repo.Name, buildID)}
 	})
 	return
 }
@@ -250,6 +250,7 @@ func (Ding) RepoBuilds() (rb []RepoBuilds) {
 	return
 }
 
+// Repo returns the named repository.
 func (Ding) Repo(repoName string) (repo Repo) {
 	transact(func(tx *sql.Tx) {
 		repo = _repo(tx, repoName)
@@ -277,7 +278,7 @@ func _checkRepo(repo Repo) {
 	}
 }
 
-// Create new repository.
+// CreateRepo creates a new repository.
 func (Ding) CreateRepo(repo Repo) (r Repo) {
 	_checkRepo(repo)
 
@@ -287,26 +288,26 @@ func (Ding) CreateRepo(repo Repo) (r Repo) {
 		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath), &id, "inserting repository in database")
 		r = _repo(tx, repo.Name)
 
-		events <- eventRepo{r}
+		events <- EventRepo{r}
 	})
 	return
 }
 
-// Save repository.
+// SaveRepo changes a repository.
 func (Ding) SaveRepo(repo Repo) (r Repo) {
 	_checkRepo(repo)
 
 	transact(func(tx *sql.Tx) {
 		q := `update repo set name=$1, vcs=$2, origin=$3, checkout_path=$4, build_script=$5 where id=$6 returning row_to_json(repo.*)`
-		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.Id), &r, "updating repo in database")
+		sherpaCheckRow(tx.QueryRow(q, repo.Name, repo.VCS, repo.Origin, repo.CheckoutPath, repo.BuildScript, repo.ID), &r, "updating repo in database")
 		r = _repo(tx, repo.Name)
 
-		events <- eventRepo{r}
+		events <- EventRepo{r}
 	})
 	return
 }
 
-// Remove repository and all its builds.
+// RemoveRepo removes a repository and all its builds.
 func (Ding) RemoveRepo(repoName string) {
 	transact(func(tx *sql.Tx) {
 		_, err := tx.Exec(`delete from result where build_id in (select id from build where repo_id in (select id from repo where name=$1))`, repoName)
@@ -318,7 +319,7 @@ func (Ding) RemoveRepo(repoName string) {
 		var id int
 		sherpaCheckRow(tx.QueryRow(`delete from repo where name=$1 returning id`, repoName), &id, "removing repo from database")
 	})
-	events <- eventRemoveRepo{repoName}
+	events <- EventRemoveRepo{repoName}
 
 	_removeDir(repoName, -1)
 
@@ -336,7 +337,7 @@ func parseInt(s string) int64 {
 }
 
 func _buildResult(repoName string, build Build) (br BuildResult) {
-	buildDir := fmt.Sprintf("data/build/%s/%d/", repoName, build.Id)
+	buildDir := fmt.Sprintf("data/build/%s/%d/", repoName, build.ID)
 	br.BuildScript = readFile(buildDir + "scripts/build.sh")
 	br.Steps = []Step{}
 
@@ -360,58 +361,59 @@ func _buildResult(repoName string, build Build) (br BuildResult) {
 	return
 }
 
-// Get build result.
-func (Ding) BuildResult(repoName string, buildId int) (br BuildResult) {
+// BuildResult returns the results of the requested build.
+func (Ding) BuildResult(repoName string, buildID int) (br BuildResult) {
 	var build Build
 	transact(func(tx *sql.Tx) {
-		build = _build(tx, repoName, buildId)
+		build = _build(tx, repoName, buildID)
 	})
 	br = _buildResult(repoName, build)
 	br.Build = build
 	return
 }
 
-// Fetch build config and results for a release.
-func (Ding) Release(repoName string, buildId int) (br BuildResult) {
+// Release fetches the build config and results for a release.
+func (Ding) Release(repoName string, buildID int) (br BuildResult) {
 	transact(func(tx *sql.Tx) {
-		build := _build(tx, repoName, buildId)
+		build := _build(tx, repoName, buildID)
 
 		q := `select row_to_json(release.*) from release where build_id=$1`
-		sherpaCheckRow(tx.QueryRow(q, buildId), &br, "fetching release from database")
+		sherpaCheckRow(tx.QueryRow(q, buildID), &br, "fetching release from database")
 		br.Build = build
 	})
 	return
 }
 
-// Remove build completely. Both from database and all local files.
-func (Ding) RemoveBuild(buildId int) {
+// RemoveBuild removes a build completely. Both from database and all local files.
+func (Ding) RemoveBuild(buildID int) {
 	var repoName string
 	transact(func(tx *sql.Tx) {
 		qrepo := `select to_json(repo.name) from build join repo on build.repo_id = repo.id where build.id = $1`
-		sherpaCheckRow(tx.QueryRow(qrepo, buildId), &repoName, "fetching repo name from database")
+		sherpaCheckRow(tx.QueryRow(qrepo, buildID), &repoName, "fetching repo name from database")
 
-		build := _build(tx, repoName, buildId)
+		build := _build(tx, repoName, buildID)
 		if build.Released != nil {
 			panic(&sherpa.Error{Code: "userError", Message: "Build has been released, cannot be removed"})
 		}
 
-		_removeBuild(tx, repoName, buildId)
+		_removeBuild(tx, repoName, buildID)
 	})
-	events <- eventRemoveBuild{repoName, buildId}
+	events <- EventRemoveBuild{repoName, buildID}
 }
 
-// Clean up (remove) the build dir.  This does not remove the build itself from the database.
-func (Ding) CleanupBuilddir(repoName string, buildId int) (build Build) {
+// CleanupBuilddir cleans up (removes) a build directory.
+// This does not remove the build itself from the database.
+func (Ding) CleanupBuilddir(repoName string, buildID int) (build Build) {
 	transact(func(tx *sql.Tx) {
-		build = _build(tx, repoName, buildId)
+		build = _build(tx, repoName, buildID)
 		if build.BuilddirRemoved {
 			panic(&sherpa.Error{Code: "userError", Message: "Builddir already removed"})
 		}
 
-		_removeBuilddir(tx, repoName, buildId)
-		build = _build(tx, repoName, buildId)
+		_removeBuilddir(tx, repoName, buildID)
+		build = _build(tx, repoName, buildID)
 		fillBuild(repoName, &build)
 	})
-	events <- eventBuild{repoName, build}
+	events <- EventBuild{repoName, build}
 	return
 }

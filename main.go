@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	DB_VERSION = 8
+	databaseVersion = 8
 )
 
 var (
 	httpFS  http.FileSystem
-	version string = "dev"
+	version = "dev"
 	config  struct {
 		ShowSherpaErrors      bool
 		PrintSherpaErrorStack bool
@@ -37,18 +37,18 @@ var (
 		Run                    []string // prefixed to commands we run. e.g. call "nice" or "timeout"
 		IsolateBuilds          struct {
 			Enabled  bool // if false, we run all build commands as the user running ding.  if true, we run each build under its own uid.
-			UidStart int  // we'll use this + buildId as the unix uid to run the commands under
-			UidEnd   int  // if we reach this uid, we wrap around to uidStart again
-			DingUid  int  // the unix uid ding runs as, used to chown files back before deleting.
-			DingGid  int  // the unix gid ding runs as, used to run build commands under.
+			UIDStart int  // we'll use this + buildId as the unix uid to run the commands under
+			UIDEnd   int  // if we reach this uid, we wrap around to uidStart again
+			DingUID  int  // the unix uid ding runs as, used to chown files back before deleting.
+			DingGID  int  // the unix gid ding runs as, used to run build commands under.
 		}
 		Mail struct {
 			Enabled,
-			SmtpTls bool
-			SmtpPort int
-			SmtpHost,
-			SmtpUsername,
-			SmtpPassword,
+			SMTPTls bool
+			SMTPPort int
+			SMTPHost,
+			SMTPUsername,
+			SMTPPassword,
 			From,
 			FromName,
 			ReplyTo,

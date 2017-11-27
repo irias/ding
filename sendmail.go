@@ -33,18 +33,18 @@ func (*fakeClient) Rcpt(to string) error              { return nil }
 func (*fakeClient) Data() (io.WriteCloser, error)     { return nopCloser{ioutil.Discard}, nil }
 func (*fakeClient) Close() error                      { return nil }
 
-func newSmtpClient() smtpClient {
+func newSMTPClient() smtpClient {
 	if !config.Mail.Enabled {
 		return &fakeClient{}
 	}
-	addr := fmt.Sprintf("%s:%d", config.Mail.SmtpHost, config.Mail.SmtpPort)
+	addr := fmt.Sprintf("%s:%d", config.Mail.SMTPHost, config.Mail.SMTPPort)
 	c, err := smtp.Dial(addr)
 	sherpaCheck(err, "connecting to mail server")
 	return c
 }
 
 func _sendmail(toName, toEmail, subject, textMsg string) {
-	c := newSmtpClient()
+	c := newSMTPClient()
 	defer func() {
 		if c != nil {
 			c.Close()
@@ -52,13 +52,13 @@ func _sendmail(toName, toEmail, subject, textMsg string) {
 		c = nil
 	}()
 
-	if config.Mail.SmtpTls {
-		tlsconfig := &tls.Config{ServerName: config.Mail.SmtpHost}
+	if config.Mail.SMTPTls {
+		tlsconfig := &tls.Config{ServerName: config.Mail.SMTPHost}
 		sherpaCheck(c.StartTLS(tlsconfig), "starting TLS with mail server")
 	}
 
-	if config.Mail.SmtpUsername != "" || config.Mail.SmtpPassword != "" {
-		auth := smtp.PlainAuth("", config.Mail.SmtpUsername, config.Mail.SmtpPassword, config.Mail.SmtpHost)
+	if config.Mail.SMTPUsername != "" || config.Mail.SMTPPassword != "" {
+		auth := smtp.PlainAuth("", config.Mail.SMTPUsername, config.Mail.SMTPPassword, config.Mail.SMTPHost)
 		sherpaCheck(c.Auth(auth), "authenticating to mail server")
 	}
 

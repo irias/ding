@@ -51,7 +51,7 @@ func servehttp(args []string) {
 	check(err, "reading config")
 
 	// be cautious
-	if config.IsolateBuilds.Enabled && (os.Getuid() != config.IsolateBuilds.DingUid || os.Getgid() != config.IsolateBuilds.DingGid) {
+	if config.IsolateBuilds.Enabled && (os.Getuid() != config.IsolateBuilds.DingUID || os.Getgid() != config.IsolateBuilds.DingGID) {
 		log.Fatalln("not running under expected uid/gid")
 	}
 
@@ -71,8 +71,8 @@ func servehttp(args []string) {
 	var dbVersion int
 	err = database.QueryRow("select max(version) from schema_upgrades").Scan(&dbVersion)
 	check(err, "fetching database schema version")
-	if dbVersion != DB_VERSION {
-		log.Fatalf("bad database schema version, expected %d, saw %d", DB_VERSION, dbVersion)
+	if dbVersion != databaseVersion {
+		log.Fatalf("bad database schema version, expected %d, saw %d", databaseVersion, dbVersion)
 	}
 
 	// mostly here to ensure go http lib doesn't do content sniffing. if it does, file serving breaks because seeking http assets is only partially implemeneted.
@@ -177,7 +177,7 @@ func servehttp(args []string) {
 					finishedJobs <- job.repoName
 				}()
 
-				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
+				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.ID)
 				_doBuild(repo, build, buildDir)
 			}()
 		}(repoBuild.Repo, repoBuild.Build)
@@ -210,14 +210,14 @@ func servehttp(args []string) {
 		check(err, "reading response from root")
 
 		switch req.msg.Kind {
-		case MsgChown, MsgRemovedir:
+		case msgChown, msgRemovedir:
 			var err error
 			if r != "" {
 				err = fmt.Errorf("%s", r)
 			}
 			req.errorResponse <- err
 
-		case MsgBuild:
+		case msgBuild:
 			if r != "" {
 				err = fmt.Errorf("%s", r)
 				log.Println("run failed:", err)
@@ -241,9 +241,9 @@ func servehttp(args []string) {
 				log.Fatalf("wanted 3 fds; got %d fds\n", len(fds))
 			}
 
-			stdout := os.NewFile(uintptr(fds[0]), fmt.Sprintf("build-%d-stdout", req.msg.BuildId))
-			stderr := os.NewFile(uintptr(fds[1]), fmt.Sprintf("build-%d-stderr", req.msg.BuildId))
-			status := os.NewFile(uintptr(fds[2]), fmt.Sprintf("build-%d-status", req.msg.BuildId))
+			stdout := os.NewFile(uintptr(fds[0]), fmt.Sprintf("build-%d-stdout", req.msg.BuildID))
+			stderr := os.NewFile(uintptr(fds[1]), fmt.Sprintf("build-%d-stderr", req.msg.BuildID))
+			status := os.NewFile(uintptr(fds[2]), fmt.Sprintf("build-%d-status", req.msg.BuildID))
 
 			req.buildResponse <- buildResult{nil, stdout, stderr, status}
 
@@ -314,7 +314,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	repoName := t[1]
-	buildId, err := strconv.Atoi(t[2])
+	buildID, err := strconv.Atoi(t[2])
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -333,7 +333,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 		join repo on build.repo_id = repo.id
 		where repo.name=$1 and build.id=$2
 	`
-	rows, err := database.Query(q, repoName, buildId)
+	rows, err := database.Query(q, repoName, buildID)
 	if err != nil {
 		fail(err)
 		return
@@ -347,7 +347,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.HasSuffix(name, "/"+basename) {
-			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoCheckoutPath, name)
+			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildID, repoCheckoutPath, name)
 			http.ServeFile(w, r, path)
 			return
 		}

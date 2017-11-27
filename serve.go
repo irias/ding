@@ -85,8 +85,8 @@ func serve(args []string) {
 	if config.IsolateBuilds.Enabled {
 		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
-				Uid:    uint32(config.IsolateBuilds.DingUid),
-				Gid:    uint32(config.IsolateBuilds.DingGid),
+				Uid:    uint32(config.IsolateBuilds.DingUID),
+				Gid:    uint32(config.IsolateBuilds.DingGID),
 				Groups: []uint32{},
 			},
 		}
@@ -109,20 +109,20 @@ func serve(args []string) {
 		check(err, "decoding msg")
 
 		switch msg.Kind {
-		case MsgChown:
-			msgChown(msg, enc)
-		case MsgRemovedir:
-			msgRemovedir(msg, enc)
-		case MsgBuild:
-			msgBuild(msg, enc, unixconn)
+		case msgChown:
+			doMsgChown(msg, enc)
+		case msgRemovedir:
+			doMsgRemovedir(msg, enc)
+		case msgBuild:
+			doMsgBuild(msg, enc, unixconn)
 		default:
 			log.Fatalf("unknown msg kind %d\n", msg.Kind)
 		}
 	}
 }
 
-func calcUid(buildId int) int {
-	return config.IsolateBuilds.UidStart + buildId%(config.IsolateBuilds.UidEnd-config.IsolateBuilds.UidStart)
+func calcUID(buildID int) int {
+	return config.IsolateBuilds.UIDStart + buildID%(config.IsolateBuilds.UIDEnd-config.IsolateBuilds.UIDStart)
 }
 
 func errstr(err error) string {
@@ -132,7 +132,7 @@ func errstr(err error) string {
 	return err.Error()
 }
 
-func msgChown(msg msg, enc *gob.Encoder) {
+func doMsgChown(msg msg, enc *gob.Encoder) {
 	if !config.IsolateBuilds.Enabled {
 		err := enc.Encode("")
 		check(err, "encoding chown response")
@@ -142,9 +142,9 @@ func msgChown(msg msg, enc *gob.Encoder) {
 	if msg.RepoName == "" {
 		log.Fatal("received MsgChown with empty RepoName")
 	}
-	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildId)
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildID)
 
-	uid := calcUid(msg.BuildId)
+	uid := calcUID(msg.BuildID)
 
 	chown := func(path string) error {
 		return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
@@ -156,7 +156,7 @@ func msgChown(msg msg, enc *gob.Encoder) {
 			if (info.Mode() & os.ModeSymlink) != 0 {
 				return nil
 			}
-			return os.Chown(path, uid, config.IsolateBuilds.DingGid)
+			return os.Chown(path, uid, config.IsolateBuilds.DingGID)
 		})
 	}
 
@@ -168,13 +168,13 @@ func msgChown(msg msg, enc *gob.Encoder) {
 	check(err, "encoding msg")
 }
 
-func msgRemovedir(msg msg, enc *gob.Encoder) {
+func doMsgRemovedir(msg msg, enc *gob.Encoder) {
 	if msg.RepoName == "" {
 		log.Fatal("received MsgRemovedir with empty RepoName")
 	}
 	path := fmt.Sprintf("%s/data/build/%s", dingWorkDir, msg.RepoName)
-	if msg.BuildId > 0 {
-		path += fmt.Sprintf("/%d", msg.BuildId)
+	if msg.BuildID > 0 {
+		path += fmt.Sprintf("/%d", msg.BuildID)
 	}
 
 	err := os.RemoveAll(path)
@@ -182,7 +182,7 @@ func msgRemovedir(msg msg, enc *gob.Encoder) {
 	check(err, "writing removedir response")
 }
 
-func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
+func doMsgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 	outr, outw, err := os.Pipe()
 	check(err, "create stdout pipe")
 	defer outr.Close()
@@ -193,10 +193,10 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 	defer errr.Close()
 	defer errw.Close()
 
-	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildId)
+	buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, msg.RepoName, msg.BuildID)
 	checkoutDir := fmt.Sprintf("%s/checkout/%s", buildDir, msg.CheckoutPath)
 
-	uid := calcUid(msg.BuildId)
+	uid := calcUID(msg.BuildID)
 
 	devnull, err := os.Open("/dev/null")
 	check(err, "opening /dev/null")
@@ -216,7 +216,7 @@ func msgBuild(msg msg, enc *gob.Encoder, unixconn *net.UnixConn) {
 		attr.Sys = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{
 				Uid:    uint32(uid),
-				Gid:    uint32(config.IsolateBuilds.DingGid),
+				Gid:    uint32(config.IsolateBuilds.DingGID),
 				Groups: []uint32{},
 			},
 		}

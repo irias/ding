@@ -17,5 +17,5 @@ func _version(args []string) {
 		fl.Usage()
 		os.Exit(2)
 	}
-	fmt.Printf("%s\ndatabase schema version %d\n", version, DB_VERSION)
+	fmt.Printf("%s\ndatabase schema version %d\n", version, databaseVersion)
 }

@@ -9,26 +9,26 @@ import (
 	"os"
 )
 
-type Script struct {
+type script struct {
 	Version  int
 	Filename string
 	SQL      string
 }
 
-func parseSQLScripts() (scripts []Script) {
+func parseSQLScripts() (scripts []script) {
 	f, err := httpFS.Open("/sql.json")
 	check(err, "opening sql scripts")
 	check(json.NewDecoder(f).Decode(&scripts), "parsing sql scripts")
 	check(f.Close(), "closing sql scripts")
 
 	lastScript := scripts[len(scripts)-1]
-	if lastScript.Version != DB_VERSION {
-		log.Fatalf("DB_VERSION %d does not match last upgrade script with version %d\n", DB_VERSION, lastScript.Version)
+	if lastScript.Version != databaseVersion {
+		log.Fatalf("databaseVersion %d does not match last upgrade script with version %d\n", databaseVersion, lastScript.Version)
 	}
 	return scripts
 }
 
-func runScripts(tx *sql.Tx, dbVersion int, scripts []Script, committing bool) {
+func runScripts(tx *sql.Tx, dbVersion int, scripts []script, committing bool) {
 	for _, script := range scripts {
 		if script.Version <= dbVersion {
 			continue

@@ -8,52 +8,59 @@ type eventStringer interface {
 	eventString() (string, []byte, error)
 }
 
-type eventRepo struct {
+// EventRepo represents an update of a repository or creation of a repository.
+type EventRepo struct {
 	Repo Repo `json:"repo"`
 }
 
-func (e eventRepo) eventString() (string, []byte, error) {
+func (e EventRepo) eventString() (string, []byte, error) {
 	buf, err := json.Marshal(e)
 	return "repo", buf, err
 }
 
-type eventRemoveRepo struct {
+// EventRemoveRepo represents the removal of a repository.
+type EventRemoveRepo struct {
 	RepoName string `json:"repo_name"`
 }
 
-func (e eventRemoveRepo) eventString() (string, []byte, error) {
+func (e EventRemoveRepo) eventString() (string, []byte, error) {
 	buf, err := json.Marshal(e)
 	return "removeRepo", buf, err
 }
 
-type eventBuild struct {
+// EventBuild represents an update to a build, or the start of a new build.
+// Output is not part of the build, see EventOutput below.
+type EventBuild struct {
 	RepoName string `json:"repo_name"`
 	Build    Build  `json:"build"`
 }
 
-func (e eventBuild) eventString() (string, []byte, error) {
+func (e EventBuild) eventString() (string, []byte, error) {
 	buf, err := json.Marshal(e)
 	return "build", buf, err
 }
 
-type eventRemoveBuild struct {
+// EventRemoveBuild represents the removal of a build from the database.
+type EventRemoveBuild struct {
 	RepoName string `json:"repo_name"`
-	BuildId  int    `json:"build_id"`
+	BuildID  int    `json:"build_id"`
 }
 
-func (e eventRemoveBuild) eventString() (string, []byte, error) {
+func (e EventRemoveBuild) eventString() (string, []byte, error) {
 	buf, err := json.Marshal(e)
 	return "removeBuild", buf, err
 }
 
-type eventOutput struct {
-	BuildId int    `json:"build_id"`
+// EventOutput represents new output from a build.
+// Text only contains the newly added output, not the full output so far.
+type EventOutput struct {
+	BuildID int    `json:"build_id"`
 	Step    string `json:"step"`  // during which the output was generated, eg `clone`, `checkout`, `build`
 	Where   string `json:"where"` // `stdout` or `stderr`
 	Text    string `json:"text"`  // lines of text written
 }
 
-func (e eventOutput) eventString() (string, []byte, error) {
+func (e EventOutput) eventString() (string, []byte, error) {
 	buf, err := json.Marshal(e)
 	return "output", buf, err
 }
