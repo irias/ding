@@ -87,6 +87,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: ding help")
 		fmt.Fprintln(os.Stderr, "       ding serve config.json")
 		fmt.Fprintln(os.Stderr, "       ding upgrade config.json [commit]")
+		fmt.Fprintln(os.Stderr, "       ding kick")
 		fmt.Fprintln(os.Stderr, "       ding version")
 		flag.PrintDefaults()
 	}
@@ -109,6 +110,8 @@ func main() {
 		servehttp(args)
 	case "upgrade":
 		upgrade(args)
+	case "kick":
+		kick(args)
 	case "version":
 		_version(args)
 	default:

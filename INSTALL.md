@@ -97,6 +97,35 @@ Why not use "sudo"? Because it does not seem possible to add sudo
 rules for ranges of UIDs.
 
 
+# Post-receive hook on git repositories
+
+If you are running your own git server, you need to install a
+post-receive hook on your git repositories. Create an executable
+file `.git/hooks/post-receive`. Example script:
+
+```sh
+	#!/bin/sh
+	PATH=$PATH:$HOME/bin
+	repo=$(basename $PWD | sed 's/\.git$//')
+	while read oldrev newrev refname; do
+	        case $refname in
+	        refs/tags/*)
+	                branch='master'
+	                ding kick https://your-ding-server/ding/ "$repo" "$branch" "$newrev"
+	                ;;
+	        refs/heads/*)
+	                branch=$(echo $refname | sed 's,^refs/heads/,,')
+	                ding kick https://your-ding-server/ding/ "$repo" "$branch" "$newrev"
+	                ;;
+	        esac
+	done
+```
+
+That will kick off builds for every incoming commit. For incoming
+tags, it will rebuild the master branch. This assumes you tag only
+on your master branch and bake tags into release version numbers.
+
+
 # Github and bitbucket webhooks for push events
 
 Ding supports starting builds on pushes to github or bitbucket
