@@ -76,7 +76,7 @@ func (Ding) Status() {
 
 	statusError := func(msg string) {
 		log.Println("status:", msg)
-		panic(&sherpa.InternalServerError{"serverError", msg})
+		panic(&sherpa.InternalServerError{Code: "serverError", Message: msg})
 	}
 
 	db := false
