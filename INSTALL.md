@@ -5,7 +5,7 @@ You'll need an empty postgres database, and a config.json file like:
 	{
 		"showSherpaErrors": true,
 		"printSherpaErrorStack": true,
-		"database": "dbname=ding host=localhost user=ding password=secretpassword sslmode=disable",
+		"database": "dbname=ding host=localhost user=ding password=secretpassword sslmode=disable connect_timeout=3 application_name=ding",
 		"environment": {
 			"GEM_PATH": "/home/ding/.gem/ruby/2.3.0",
 			"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/ding/node_modules/.bin/:/home/ding/.gem/ruby/2.3.0/bin:/home/ding/toolchains/bin",
