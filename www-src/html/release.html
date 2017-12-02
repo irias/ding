@@ -33,7 +33,12 @@
 		<div class="panel panel-default">
 			<div class="panel-heading">
 				<div class="panel-title">
-					Released files
+					<div style="float: left">Released files</div>
+					<div style="float: right" ng-if="build.results.length > 0">
+						<a btn="default" icon="download" style="margin-top: -5px; margin-bottom: -5px" ng-href="/download/release/{{ repo.name }}/{{ build.id }}/{{ repo.name }}-{{ build.results[0].version }}.zip" uib-tooltip="Download all released files as .zip">zip</a>
+						<a btn="default" icon="download" style="margin-top: -5px; margin-bottom: -5px" ng-href="/download/release/{{ repo.name }}/{{ build.id }}/{{ repo.name }}-{{ build.results[0].version }}.tgz" uib-tooltip="Download all released files as .tgz">tgz</a>
+					</div>
+					<div class="clearfix"></div>
 				</div>
 			</div>
 			<table class="table">

@@ -103,6 +103,7 @@ func servehttp(args []string) {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/release/", serveRelease)
 	http.HandleFunc("/result/", serveResult)
+	http.HandleFunc("/download/", serveDownload)
 	http.HandleFunc("/events", serveEvents)
 
 	go eventMux()
@@ -290,13 +291,23 @@ func serveAsset(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, r.URL.Path, info.ModTime(), f)
 }
 
+func hasBadElems(elems []string) bool {
+	for _, e := range elems {
+		switch e {
+		case "", ".", "..":
+			return true
+		}
+	}
+	return false
+}
+
 func serveRelease(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "bad method", 405)
 		return
 	}
 	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
+	if len(t) != 4 || hasBadElems(t[1:]) {
 		http.NotFound(w, r)
 		return
 	}
@@ -309,7 +320,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
+	if len(t) != 4 || hasBadElems(t[1:]) {
 		http.NotFound(w, r)
 		return
 	}
