@@ -1,11 +1,13 @@
 package main
 
 import (
+	"compress/gzip"
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"net"
@@ -311,7 +313,47 @@ func serveRelease(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, fmt.Sprintf("data/release/%s/%s/%s", t[1], t[2], t[3]))
+
+	name := t[3]
+	path := fmt.Sprintf("data/release/%s/%s/%s.gz", t[1], t[2], name)
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "server error", 500)
+		return
+	}
+	defer f.Close()
+
+	if acceptsGzip(r.Header.Get("Accept-Encoding")) {
+		w.Header().Set("Content-Encoding", "gzip")
+		io.Copy(w, f) // nothing to do for errors
+	} else {
+		gzr, err := gzip.NewReader(f)
+		if err != nil {
+			log.Printf("release: reading gzip file %s: %s\n", path, err)
+			http.Error(w, "server error", 500)
+			return
+		}
+		io.Copy(w, gzr) // nothing to do for errors
+	}
+}
+
+func acceptsGzip(s string) bool {
+	t := strings.Split(s, ",")
+	for _, e := range t {
+		e = strings.TrimSpace(e)
+		tt := strings.Split(e, ";")
+		if len(tt) > 1 && t[1] == "q=0" {
+			continue
+		}
+		if tt[0] == "gzip" {
+			return true
+		}
+	}
+	return false
 }
 
 func serveResult(w http.ResponseWriter, r *http.Request) {

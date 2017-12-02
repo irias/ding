@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -189,7 +190,7 @@ func (Ding) CreateRelease(repoName string, buildID int) (build Build) {
 		sherpaCheckRow(tx.QueryRow(q, build.ID), &filenames, "fetching build results from database")
 		checkoutDir := fmt.Sprintf("data/build/%s/%d/checkout/%s", repo.Name, build.ID, repo.CheckoutPath)
 		for _, filename := range filenames {
-			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s", repo.Name, build.ID, path.Base(filename)))
+			fileCopy(checkoutDir+"/"+filename, fmt.Sprintf("data/release/%s/%d/%s.gz", repo.Name, build.ID, path.Base(filename)))
 		}
 
 		events <- EventBuild{repo.Name, _build(tx, repo.Name, buildID)}
@@ -205,17 +206,22 @@ func fileCopy(src, dst string) {
 	defer sf.Close()
 	df, err := os.Create(dst)
 	sherpaCheck(err, "creating destination result file")
+	gzw := gzip.NewWriter(df)
 	defer func() {
-		err2 := df.Close()
-		if err == nil {
-			err = err2
+		xerr := func(err1, err2 error) error {
+			if err1 == nil {
+				return err2
+			}
+			return err1
 		}
+		err = xerr(err, gzw.Close())
+		err = xerr(err, df.Close())
 		if err != nil {
 			os.Remove(dst)
 			sherpaCheck(err, "installing result file")
 		}
 	}()
-	_, err = io.Copy(df, sf)
+	_, err = io.Copy(gzw, sf)
 	sherpaCheck(err, "copying result file to destination")
 }
 

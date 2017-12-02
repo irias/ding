@@ -151,7 +151,6 @@ Now run: "make build test release"
 - implement timeouts for builds.  no output for X minutes -> kill.
 - add shell script to cleanup after a build? eg dropping a database.
 - timestamps in output lines?
-- compress released files with gzip and serve them gzipped if possible.  and use gzipped files directly when adding to .zip.
 - more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
 - make this work somewhat on windows? hard given the privsep design.
