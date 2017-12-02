@@ -23,8 +23,9 @@ Ding provides a web API at /ding/, open it once you've got it
 installed. It includes an option to get real-time updates to builds
 and repositories.
 
-Dingkick is a small tool you can use in a git hook to signal that a build
-should start. Github and bitbucket webhooks are also supported.
+"Ding kick" is a subcommand you can use in a git hook to signal
+that a build should start. Github and bitbucket webhooks are also
+supported.
 
 See [INSTALL.md](INSTALL.md) for installation instructions.
 
@@ -37,7 +38,7 @@ See [INSTALL.md](INSTALL.md) for installation instructions.
 
 Ding is distributed as a self-contained binary. It includes
 installation instructions (run "ding help") and database setup/upgrade
-scripts ("ding upgrade")
+scripts ("ding upgrade").
 
 
 # Download
@@ -59,7 +60,7 @@ other.
 
 # Non-features
 
-We do _NOT_ ...
+Ding does _NOT_ ...
 
 - do deployments: Different task, different software. Ding exports
 released files which can be picked up by deployment tools.
@@ -72,8 +73,8 @@ need other services, say a database server, just configure it when
 setting up your repository in Ding. If you need certain OS dependencies
 installed, first try to get rid of those dependencies. If that isn't
 an option, install the dependencies on the build server.
-- call ourselves "continuous integration" or CI server. Mostly
-because that term doesn't seem to be describing what we do.
+- call itself "continuous integration" or CI server. Mostly
+because that term doesn't seem to be describing what Ding do.
 
 
 # License
@@ -147,12 +148,8 @@ Now run: "make build test release"
 - allow configuring a cleanup script, that is run when a builddir is removed. eg for dropping a database that was created in build.sh.
 - read some file from $HOME after a build and show it in build overviews? eg for code coverage, or whatever. easy & extensible.
 - provide access to the builddir from the previous build, eg to copy dependencies. or perhaps we could also do a faster clone ourselves.
-- implement timeouts for builds.  no output for X minutes -> kill.
-- add shell script to cleanup after a build? eg dropping a database.
 - timestamps in output lines?
-- compress released files with gzip and serve them gzipped if possible.
-- provide option to download a .zip or .tgz with all files in a release.
 - more ways to send out notifications? eg webhook, telegram, slack.
 - support for running builds on other instances (on other OS'es). maybe some day, if really needed.
 - make this work somewhat on windows? hard given the privsep design.
-- add SSE statistics to prometheus metrics?
+- add SSE statistics to prometheus metrics?  and metrics about builds, build times, failed builds.

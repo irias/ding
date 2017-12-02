@@ -3,37 +3,24 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
 	"bitbucket.org/mjl/sherpa"
 )
 
-var (
-	version = "dev"
-)
-
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: dingkick baseURL repoName branch commit")
-	flag.PrintDefaults()
-}
-
-func check(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s\n", msg, err)
+func kick(args []string) {
+	fs := flag.NewFlagSet("kick", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: ding kick baseURL repoName branch commit")
+		fs.PrintDefaults()
 	}
-}
-
-func main() {
-	log.SetFlags(0)
-	log.SetPrefix("dingkick: ")
-	flag.Usage = usage
-	flag.Parse()
-	args := flag.Args()
+	fs.Parse(args)
+	args = fs.Args()
 	if len(args) != 4 {
-		usage()
+		fs.Usage()
 		os.Exit(2)
 	}
+
 	baseURL := args[0]
 	repoName := args[1]
 	branch := args[2]
@@ -43,10 +30,10 @@ func main() {
 	check(err, "initializing sherpa client")
 
 	var build struct {
-		Id int64
+		ID int64
 	}
 	err = client.Call(&build, "createBuild", repoName, branch, commit)
 	check(err, "building")
-	_, err = fmt.Println("buildId", build.Id)
+	_, err = fmt.Println("buildId", build.ID)
 	check(err, "write")
 }

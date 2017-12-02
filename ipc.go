@@ -9,7 +9,7 @@ type msg struct {
 	Kind msgKind
 
 	RepoName     string
-	BuildId      int
+	BuildID      int
 	CheckoutPath string   // for the workdir of the build command
 	Env          []string // environment when building
 }
@@ -17,9 +17,9 @@ type msg struct {
 type msgKind int
 
 const (
-	MsgChown     = msgKind(iota) // chown the homedir & checkoutdir of a build
-	MsgRemovedir                 // remove a builddir, or (if buildId < 0), an entire repo
-	MsgBuild                     // start a build by running build.sh
+	msgChown     = msgKind(iota) // chown the homedir & checkoutdir of a build
+	msgRemovedir                 // remove a builddir, or (if buildId < 0), an entire repo
+	msgBuild                     // start a build by running build.sh
 )
 
 // request from one of the http handlers to httpserve's request mux

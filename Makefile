@@ -13,6 +13,8 @@ frontend:
 	python www-src/build.py
 
 test:
+	go vet
+	golint
 	go test -cover -- local/config-test.json
 
 release:

@@ -4,9 +4,9 @@ import (
 	"time"
 )
 
-// Repository with origin and build script.
+// Repo is a repository as stored in the database.
 type Repo struct {
-	Id           int    `json:"id"`
+	ID           int    `json:"id"`
 	Name         string `json:"name"`          // short name for repo, typically last element of repo URL/path
 	VCS          string `json:"vcs"`           // `git`, `mercurial` or `command`
 	Origin       string `json:"origin"`        // git/mercurial "URL" (as understood by the respective commands), often SSH or HTTPS. if `vcs` is `command`, this is executed using sh.
@@ -14,13 +14,13 @@ type Repo struct {
 	BuildScript  string `json:"build_script"`  // shell scripts that compiles the software, runs tests, and creates releasable files.
 }
 
-// Repo and its most recent build per branch.
+// RepoBuilds is a repository and its most recent build per branch.
 type RepoBuilds struct {
 	Repo   Repo    `json:"repo"`
 	Builds []Build `json:"builds"`
 }
 
-// File created during a build, as the result of a build. Files like this can be released.
+// Result is a file created during a build, as the result of a build. Files like this can be released.
 type Result struct {
 	Command   string `json:"command"`   // short name of command, without version, as you would want to run it from a command-line
 	Version   string `json:"version"`   // typically semvar, x.y.z
@@ -31,10 +31,10 @@ type Result struct {
 	Filesize  int64  `json:"filesize"`  // size of filename
 }
 
-// An attempt at building a repository.
+// Build is an attempt at building a repository.
 type Build struct {
-	Id              int        `json:"id"`
-	RepoId          int        `json:"repo_id"`
+	ID              int        `json:"id"`
+	RepoID          int        `json:"repo_id"`
 	Branch          string     `json:"branch"`
 	CommitHash      string     `json:"commit_hash"` // can be empty until `checkout` step, when building latest version of a branch
 	Status          string     `json:"status"`      // `new`, `clone`, `checkout`, `build`, `success`
@@ -49,7 +49,7 @@ type Build struct {
 	DiskUsage int64  `json:"disk_usage"` // disk usage for build
 }
 
-// Step and the output generated while executing it.
+// Step is one phase of a build and stores the output generated in that step.
 type Step struct {
 	Name   string `json:"name"` // same values as build.status
 	Stdout string `json:"stdout"`
@@ -58,6 +58,7 @@ type Step struct {
 	Nsec   int64  `json:"nsec"`   // time it took this step to finish, initially 0
 }
 
+// BuildResult is the stored result of a build, including the build script and step outputs.
 type BuildResult struct {
 	Build       Build  `json:"build"`
 	BuildScript string `json:"build_script"`

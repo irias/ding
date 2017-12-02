@@ -5,7 +5,7 @@ You'll need an empty postgres database, and a config.json file like:
 	{
 		"showSherpaErrors": true,
 		"printSherpaErrorStack": true,
-		"database": "dbname=ding host=localhost user=ding password=secretpassword sslmode=disable",
+		"database": "dbname=ding host=localhost user=ding password=secretpassword sslmode=disable connect_timeout=3 application_name=ding",
 		"environment": {
 			"GEM_PATH": "/home/ding/.gem/ruby/2.3.0",
 			"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/ding/node_modules/.bin/:/home/ding/.gem/ruby/2.3.0/bin:/home/ding/toolchains/bin",
@@ -61,39 +61,69 @@ Or mercurial (hg), or any other VCS you want to use.
 You probably want to enable email notifications for failed builds.
 Configure a mail server, and set "mail", "enabled" to true.
 
-We don't support other mechanisms to send notifications (like
-outgoing webhooks, or IRC/telegram/slack/etc). Instead we have a
+Ding does not support other mechanisms to send notifications (like
+outgoing webhooks, or IRC/telegram/slack/etc). Instead Ding has a
 real-time streaming updates API that can be used for those purposes.
 
 
 # Isolate builds
 
 You should also isolate builds by running each build under a unique
-user id (uid):
+user id (UID):
 
 - Configure the "isolateBuild" section in your config file. "dingUid"
 and "dingGid" are the id's that the ding webserver will run under.
 "uidStart" (inclusive) and "uidEnd" (exclusive) denotes the range
 of user id's that ding will assign to builds. Build commands use
-"dingGid" as their gid. Make sure the uids don't overlap with regular
+"dingGid" as their gid. Make sure the UIDs don't overlap with regular
 users.
 - Start ding as root, with umask 027. The umask ensures the
 unpriviledged ding process can read build results.
 
 "Run as root? Are you crazy?" No. Ding isn't actually running all
-its code with root priviledges. Early during startup, ding forks
+its code with root priviledges. Early during startup, Ding forks
 off a child process with dinguid/dinggid. That process handles all
 HTTP requests. There is still a process running as root, but its
 only purpose is:
 
-1. Starting builds under a unique uid.
-2. Managing files created by the unique uid, such as chown/remove them.
+1. Starting builds under a unique UID.
+2. Managing files created by the unique UID, such as chown/remove them.
 
-The processes communicate through a simple protocol over a shared
-socket. This privilege separation technique is popularized by OpenBSD.
+The processes communicate through a simple protocol over a unix
+socket. This privilege separation technique is popularized by
+OpenBSD.
 
 Why not use "sudo"? Because it does not seem possible to add sudo
-rules for ranges of user id's.
+rules for ranges of UIDs.
+
+
+# Post-receive hook on git repositories
+
+If you are running your own git server, you need to install a
+post-receive hook on your git repositories. Create an executable
+file `.git/hooks/post-receive`. Example script:
+
+```sh
+	#!/bin/sh
+	PATH=$PATH:$HOME/bin
+	repo=$(basename $PWD | sed 's/\.git$//')
+	while read oldrev newrev refname; do
+	        case $refname in
+	        refs/tags/*)
+	                branch='master'
+	                ding kick https://your-ding-server/ding/ "$repo" "$branch" "$newrev"
+	                ;;
+	        refs/heads/*)
+	                branch=$(echo $refname | sed 's,^refs/heads/,,')
+	                ding kick https://your-ding-server/ding/ "$repo" "$branch" "$newrev"
+	                ;;
+	        esac
+	done
+```
+
+That will kick off builds for every incoming commit. For incoming
+tags, it will rebuild the master branch. This assumes you tag only
+on your master branch and bake tags into release version numbers.
 
 
 # Github and bitbucket webhooks for push events
@@ -155,8 +185,8 @@ Ding exposes Prometheus metrics at HTTP endpoint /metrics.
 This includes statistics on usage for the API.
 
 You can also set up simple HTTP monitoring on /ding/status. It's
-the "status" API call and it will a 5xx status when one of its
-underlying services (file system, database) is not available.
+the "status" API call and it will raise a 5xx status when one of
+its underlying services (file system, database) is not available.
 
 
 # Service file
@@ -174,8 +204,8 @@ Example service file for systemd:
 	LimitNOFILE=16384
 	SyslogIdentifier=ding
 	SyslogFacility=local0
-	User=ding
-	Group=ding
+	User=root
+	Group=root
 	WorkingDirectory=/home/irias/projects/ding
 	ExecStart=/home/irias/projects/ding/ding serve -listen 127.0.0.1:6084 -listenwebhook 127.0.0.1:6085 config.json
 
@@ -183,4 +213,4 @@ Example service file for systemd:
 	WantedBy=multi-user.target
 
 This listens only on the loopback IP. Note we don't keep the binary
-and config in the (mostly empty) ding home directory.
+and config in the (mostly empty) ding home directory, /home/ding.

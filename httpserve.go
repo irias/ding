@@ -1,11 +1,13 @@
 package main
 
 import (
+	"compress/gzip"
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"net"
@@ -51,7 +53,7 @@ func servehttp(args []string) {
 	check(err, "reading config")
 
 	// be cautious
-	if config.IsolateBuilds.Enabled && (os.Getuid() != config.IsolateBuilds.DingUid || os.Getgid() != config.IsolateBuilds.DingGid) {
+	if config.IsolateBuilds.Enabled && (os.Getuid() != config.IsolateBuilds.DingUID || os.Getgid() != config.IsolateBuilds.DingGID) {
 		log.Fatalln("not running under expected uid/gid")
 	}
 
@@ -71,8 +73,8 @@ func servehttp(args []string) {
 	var dbVersion int
 	err = database.QueryRow("select max(version) from schema_upgrades").Scan(&dbVersion)
 	check(err, "fetching database schema version")
-	if dbVersion != DB_VERSION {
-		log.Fatalf("bad database schema version, expected %d, saw %d", DB_VERSION, dbVersion)
+	if dbVersion != databaseVersion {
+		log.Fatalf("bad database schema version, expected %d, saw %d", databaseVersion, dbVersion)
 	}
 
 	// mostly here to ensure go http lib doesn't do content sniffing. if it does, file serving breaks because seeking http assets is only partially implemeneted.
@@ -103,6 +105,7 @@ func servehttp(args []string) {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/release/", serveRelease)
 	http.HandleFunc("/result/", serveResult)
+	http.HandleFunc("/download/", serveDownload)
 	http.HandleFunc("/events", serveEvents)
 
 	go eventMux()
@@ -177,7 +180,7 @@ func servehttp(args []string) {
 					finishedJobs <- job.repoName
 				}()
 
-				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.Id)
+				buildDir := fmt.Sprintf("%s/data/build/%s/%d", dingWorkDir, repo.Name, build.ID)
 				_doBuild(repo, build, buildDir)
 			}()
 		}(repoBuild.Repo, repoBuild.Build)
@@ -210,14 +213,14 @@ func servehttp(args []string) {
 		check(err, "reading response from root")
 
 		switch req.msg.Kind {
-		case MsgChown, MsgRemovedir:
+		case msgChown, msgRemovedir:
 			var err error
 			if r != "" {
 				err = fmt.Errorf("%s", r)
 			}
 			req.errorResponse <- err
 
-		case MsgBuild:
+		case msgBuild:
 			if r != "" {
 				err = fmt.Errorf("%s", r)
 				log.Println("run failed:", err)
@@ -241,9 +244,9 @@ func servehttp(args []string) {
 				log.Fatalf("wanted 3 fds; got %d fds\n", len(fds))
 			}
 
-			stdout := os.NewFile(uintptr(fds[0]), fmt.Sprintf("build-%d-stdout", req.msg.BuildId))
-			stderr := os.NewFile(uintptr(fds[1]), fmt.Sprintf("build-%d-stderr", req.msg.BuildId))
-			status := os.NewFile(uintptr(fds[2]), fmt.Sprintf("build-%d-status", req.msg.BuildId))
+			stdout := os.NewFile(uintptr(fds[0]), fmt.Sprintf("build-%d-stdout", req.msg.BuildID))
+			stderr := os.NewFile(uintptr(fds[1]), fmt.Sprintf("build-%d-stderr", req.msg.BuildID))
+			status := os.NewFile(uintptr(fds[2]), fmt.Sprintf("build-%d-status", req.msg.BuildID))
 
 			req.buildResponse <- buildResult{nil, stdout, stderr, status}
 
@@ -290,17 +293,67 @@ func serveAsset(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, r.URL.Path, info.ModTime(), f)
 }
 
+func hasBadElems(elems []string) bool {
+	for _, e := range elems {
+		switch e {
+		case "", ".", "..":
+			return true
+		}
+	}
+	return false
+}
+
 func serveRelease(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "bad method", 405)
 		return
 	}
 	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
+	if len(t) != 4 || hasBadElems(t[1:]) {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, fmt.Sprintf("data/release/%s/%s/%s", t[1], t[2], t[3]))
+
+	name := t[3]
+	path := fmt.Sprintf("data/release/%s/%s/%s.gz", t[1], t[2], name)
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "server error", 500)
+		return
+	}
+	defer f.Close()
+
+	if acceptsGzip(r.Header.Get("Accept-Encoding")) {
+		w.Header().Set("Content-Encoding", "gzip")
+		io.Copy(w, f) // nothing to do for errors
+	} else {
+		gzr, err := gzip.NewReader(f)
+		if err != nil {
+			log.Printf("release: reading gzip file %s: %s\n", path, err)
+			http.Error(w, "server error", 500)
+			return
+		}
+		io.Copy(w, gzr) // nothing to do for errors
+	}
+}
+
+func acceptsGzip(s string) bool {
+	t := strings.Split(s, ",")
+	for _, e := range t {
+		e = strings.TrimSpace(e)
+		tt := strings.Split(e, ";")
+		if len(tt) > 1 && t[1] == "q=0" {
+			continue
+		}
+		if tt[0] == "gzip" {
+			return true
+		}
+	}
+	return false
 }
 
 func serveResult(w http.ResponseWriter, r *http.Request) {
@@ -309,12 +362,12 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := strings.Split(r.URL.Path[1:], "/")
-	if len(t) != 4 || t[1] == ".." || t[1] == "." || t[2] == ".." || t[2] == "." || t[3] == ".." || t[3] == "." {
+	if len(t) != 4 || hasBadElems(t[1:]) {
 		http.NotFound(w, r)
 		return
 	}
 	repoName := t[1]
-	buildId, err := strconv.Atoi(t[2])
+	buildID, err := strconv.Atoi(t[2])
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -333,7 +386,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 		join repo on build.repo_id = repo.id
 		where repo.name=$1 and build.id=$2
 	`
-	rows, err := database.Query(q, repoName, buildId)
+	rows, err := database.Query(q, repoName, buildID)
 	if err != nil {
 		fail(err)
 		return
@@ -347,7 +400,7 @@ func serveResult(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.HasSuffix(name, "/"+basename) {
-			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildId, repoCheckoutPath, name)
+			path := fmt.Sprintf("data/build/%s/%d/checkout/%s/%s", repoName, buildID, repoCheckoutPath, name)
 			http.ServeFile(w, r, path)
 			return
 		}
