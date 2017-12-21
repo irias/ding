@@ -30,3 +30,7 @@ clean:
 	go clean
 	-rm -r assets
 	python www-src/build.py clean
+
+setup:
+	-mkdir -p node_modules/.bin
+	npm install jshint@2.9.3 node-sass@4.7.2

@@ -60,7 +60,7 @@ def build(dest):
 	# app css
 	d = target('static/css/app.css')
 	s = srcdir + 'scss/app.scss'
-	bl.test(d, [s]+bl.dirlist(srcdir + 'scss', suffix='.scss', prefix='_'), lambda: bl.ensuredir(d) and bl.run('sass', '--style', 'compact', s, d))
+	bl.test(d, [s]+bl.dirlist(srcdir + 'scss', suffix='.scss', prefix='_'), lambda: bl.ensuredir(d) and bl.run(os.path.join('node_modules', '.bin', 'node-sass'), '--style', 'compact', s, d))
 
 
 	# fonts
