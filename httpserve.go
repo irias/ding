@@ -260,7 +260,7 @@ func serveAsset(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/") {
 		r.URL.Path += "index.html"
 	}
-	f, err := httpFS.Open(r.URL.Path)
+	f, err := httpFS.Open("web/" + r.URL.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.NotFound(w, r)

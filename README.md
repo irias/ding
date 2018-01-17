@@ -129,10 +129,9 @@ For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
 # Developing
 
 You obviously need a Go compiler.
-But you'll also need:
-- to install the sherpadoc tool: (cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
-- python (v2) to build the frontend files
-- jshint and node-sass through npm and nodejs to check the JavaScript code and compile SASS: make setup
+But you'll also need to run "make setup" to:
+- install the sherpadoc tool
+- install jshint and node-sass through npm (nodejs), to check the JavaScript code and compile SASS
 
 Now run: "make build test release"
 

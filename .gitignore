@@ -4,10 +4,9 @@
 /assets.zip
 /ding
 /node_modules/
+/fabricate/fabricate
 
 /data/
 
 .hg/
 *.swp
-*.pyc
-/runas
