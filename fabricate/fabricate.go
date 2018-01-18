@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -103,7 +104,7 @@ func build(dest string) {
 	)
 	if dirty(d, s) {
 		os.MkdirAll(path.Dir(d), os.ModePerm)
-		run(path.Join("node_modules", ".bin", "node-sass"), "--style", "compact", s[0], d)
+		run(filepath.Join("node_modules", ".bin", "node-sass"), "--style", "compact", s[0], d)
 	}
 
 	// fonts

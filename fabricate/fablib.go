@@ -53,7 +53,7 @@ func write(p, contents string) {
 }
 
 func jshint(paths ...string) bool {
-	jshintPath := path.Join("node_modules", ".bin", "jshint")
+	jshintPath := filepath.Join("node_modules", ".bin", "jshint")
 	return run(jshintPath, paths...)
 }
 
@@ -113,7 +113,7 @@ func dirlist(dir, suffix, prefix string) (r []string) {
 	for _, fi := range l {
 		name := fi.Name()
 		if strings.HasSuffix(name, suffix) && strings.HasPrefix(name, prefix) {
-			r = append(r, dir+"/"+name)
+			r = append(r, filepath.ToSlash(dir+"/"+name))
 		}
 	}
 	return
@@ -124,7 +124,7 @@ func dirtree(dir, suffix string) (r []string) {
 		check(err, "walk")
 		name := info.Name()
 		if !info.IsDir() && strings.HasSuffix(name, suffix) {
-			r = append(r, p)
+			r = append(r, filepath.ToSlash(p))
 		}
 		return nil
 	})
