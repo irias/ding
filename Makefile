@@ -7,10 +7,13 @@ run-root: build
 fabricate/fabricate: fabricate/fabricate.go fabricate/fablib.go
 	(cd fabricate && go build)
 
-build: fabricate/fabricate
+vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc: vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/*.go
+	(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go build)
+
+build: fabricate/fabricate vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc
 	go build -i
 	./fabricate/fabricate install
-	sherpadoc Ding >assets/ding.json
+	vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc Ding >assets/ding.json
 
 frontend: fabricate/fabricate
 	./fabricate/fabricate install
@@ -40,8 +43,8 @@ clean: fabricate/fabricate
 	-rm -r assets assets.zip
 	./fabricate/fabricate clean
 	(cd fabricate && go clean)
+	(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go clean)
 
 setup:
-	(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
 	-mkdir -p node_modules/.bin
 	npm install jshint@2.9.3 node-sass@4.7.2

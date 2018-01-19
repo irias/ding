@@ -5,6 +5,7 @@
 /ding
 /node_modules/
 /fabricate/fabricate
+/vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc
 
 /data/
 
