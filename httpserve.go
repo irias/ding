@@ -77,14 +77,10 @@ func servehttp(args []string) {
 		log.Fatalf("bad database schema version, expected %d, saw %d", databaseVersion, dbVersion)
 	}
 
-	// mostly here to ensure go http lib doesn't do content sniffing. if it does, file serving breaks because seeking http assets is only partially implemeneted.
-	mime.AddExtensionType(".woff", "font/woff")
+	// so http package returns these known mimetypes
 	mime.AddExtensionType(".woff2", "font/woff2")
-	mime.AddExtensionType(".eot", "application/vnd.ms-fontobject")
-	mime.AddExtensionType(".svg", "image/svg+xml")
 	mime.AddExtensionType(".ttf", "font/ttf")
 	mime.AddExtensionType(".otf", "font/otf")
-	mime.AddExtensionType(".map", "application/json") // browser trying to look for css/js .map files
 
 	var doc sherpa.Doc
 	ff, err := httpFS.Open("/ding.json")
