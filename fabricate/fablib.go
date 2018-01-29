@@ -80,13 +80,21 @@ func makehash(p string) string {
 }
 
 func revrepl(contents, dest string) string {
-	re := regexp.MustCompile(`\s(href|src)="([^"]+)\?v=[a-zA-Z0-9]+"`)
-	return re.ReplaceAllStringFunc(contents, func(s string) string {
-		l := re.FindStringSubmatch(s)
+	re1 := regexp.MustCompile(`\s(href|src)="([^"]+)\?v=[a-zA-Z0-9]+"`)
+	contents = re1.ReplaceAllStringFunc(contents, func(s string) string {
+		l := re1.FindStringSubmatch(s)
 		filename := l[2]
 		v := makehash(dest + "/" + filename)
 		return fmt.Sprintf(` %s="%s?v=%s"`, l[1], filename, v)
 	})
+	re2 := regexp.MustCompile(`url\('([^']+)\?v=[a-zA-Z0-9]+'\)`)
+	contents = re2.ReplaceAllStringFunc(contents, func(s string) string {
+		l := re2.FindStringSubmatch(s)
+		filename := l[1]
+		v := makehash(dest + "/" + filename)
+		return fmt.Sprintf(`url('%s?v=%s')`, filename, v)
+	})
+	return contents
 }
 
 func run(cmd string, args ...string) bool {
