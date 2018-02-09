@@ -5,10 +5,10 @@ run-root: build
 	sudo ./ding serve local/config.json
 
 fabricate/fabricate: fabricate/fabricate.go fabricate/fablib.go
-	(cd fabricate && go build)
+	go build -o $@ ./fabricate
 
 vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc: vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/*.go
-	(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go build)
+	go build -o $@ ./vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc
 
 build: fabricate/fabricate vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc/sherpadoc
 	go build -i
@@ -42,8 +42,8 @@ clean: fabricate/fabricate
 	go clean
 	-rm -r assets assets.zip
 	./fabricate/fabricate clean
-	(cd fabricate && go clean)
-	(cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go clean)
+	go clean ./fabricate
+	go clean ./vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc
 
 setup:
 	-mkdir -p node_modules/.bin
