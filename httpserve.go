@@ -169,7 +169,6 @@ func servehttp(args []string) {
 		log.Printf("marked %s stale build as failed\n", buildDir)
 	}
 
-	var buf []byte
 	var newBuilds []struct {
 		Repo  Repo
 		Build Build
@@ -179,8 +178,7 @@ func servehttp(args []string) {
 			select row_to_json(repo.*) as repo, row_to_json(build.*) as build from repo join build on repo.id = build.repo_id where status='new'
 		) x
 	`
-	check(database.QueryRow(qnew).Scan(&buf), "fetching new builds from database")
-	check(json.Unmarshal(buf, &newBuilds), "parsing new builds from database")
+	checkRow(database.QueryRow(qnew), &newBuilds, "fetching new builds from database")
 	for _, repoBuild := range newBuilds {
 		func(repo Repo, build Build) {
 			job := job{
