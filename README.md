@@ -141,7 +141,6 @@ Now run: "make build test release"
 - add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
 - when on a build page, show it if a new build is already in progress, with a link to that new build
 - show last two lines of output. now the "make failed"-line is making that output not so useful.
-- compile and use sherpadoc from tree. don't assume it is available.
 
 ## Maybe
 - allow configuring a cleanup script, that is run when a builddir is removed. eg for dropping a database that was created in build.sh.
