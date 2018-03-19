@@ -137,6 +137,29 @@ func runScripts(tx *sql.Tx, dbVersion int, scripts []script, committing bool) {
 					gzipFile(file)
 				}
 			}
+		case 10:
+			var repoBuilds []struct {
+				RepoName string
+				BuildID  int64
+			}
+			q := `
+				with repo_builds as (
+					select
+						r.name as repoName,
+						b.id as buildID
+					from build b
+					join repo r on b.repo_id = r.id
+				)
+				select coalesce(json_agg(rb.*), '[]')
+				from repo_builds rb
+			`
+			checkRow(tx.QueryRow(q), &repoBuilds, "listing builds in database")
+			for _, rb := range repoBuilds {
+				buildDir := fmt.Sprintf("data/build/%s/%d/", rb.RepoName, rb.BuildID)
+				du := buildDiskUsage(buildDir)
+				qup := `update build set disk_usage=$1 where id=$2 returning id`
+				checkRow(tx.QueryRow(qup, du, rb.BuildID), &rb.BuildID, "updating disk usage in database for build")
+			}
 		}
 	}
 	return

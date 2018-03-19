@@ -4,21 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 func fillBuild(repoName string, b *Build) {
-	// add disk usage
-	b.DiskUsage = 0
-	buildDir := fmt.Sprintf("data/build/%s/%d", repoName, b.ID)
-	filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil {
-			const overhead = 2 * 1024
-			b.DiskUsage += overhead + info.Size()
-		}
-		return nil
-	})
-
 	if b.Finish == nil || b.Status == "success" {
 		return
 	}

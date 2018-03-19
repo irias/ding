@@ -143,12 +143,30 @@ func servehttp(args []string) {
 	}()
 
 	unfinishedMsg := "marked as failed/unfinished at ding startup."
-	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null and status!='new'`, unfinishedMsg)
-	check(err, "marking unfinished builds as failed")
-	rows, err := result.RowsAffected()
-	check(err, "reading affected rows for marking unfinished builds as failed")
-	if rows > 0 {
-		log.Printf("marked %d unfinished builds as failed\n", rows)
+	qStale := `
+		with repo_builds as (
+			select
+				r.name as repoName,
+				b.id as buildID
+			from build b
+			join repo r on b.repo_id = r.id
+			where b.finish is null and b.status!='new'
+		)
+		select coalesce(json_agg(rb.*), '[]')
+		from repo_builds rb
+	`
+	var stales []struct {
+		RepoName string
+		BuildID  int
+	}
+	checkRow(database.QueryRow(qStale), &stales, "looking for stale builds in database")
+	for _, stale := range stales {
+		buildDir := fmt.Sprintf("data/build/%s/%d/", stale.RepoName, stale.BuildID)
+		du := buildDiskUsage(buildDir)
+
+		qMarkStale := `update build set finish=now(), error_message=$1, disk_usage=$2 where finish is null and status!='new' returning id`
+		checkRow(database.QueryRow(qMarkStale, unfinishedMsg, du), &stale.BuildID, "marking stale build in database")
+		log.Printf("marked %s stale build as failed\n", buildDir)
 	}
 
 	var buf []byte
