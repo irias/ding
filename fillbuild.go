@@ -7,6 +7,12 @@ import (
 )
 
 func fillBuild(repoName string, b *Build) {
+	// we only fill it in if not already set. typically during a build.
+	if b.DiskUsage == 0 {
+		buildDir := fmt.Sprintf("data/build/%s/%d", repoName, b.ID)
+		b.DiskUsage = buildDiskUsage(buildDir)
+	}
+
 	if b.Finish == nil || b.Status == "success" {
 		return
 	}
