@@ -16,19 +16,23 @@ An example:
 		"bitbucket.org/mjl/httpasset"
 	)
 
-	func main() {
+	var httpFS http.FileSystem
+
+	func init() {
 		// the error-check is optional, httpasset.Fs() always returns a non-nil http.FileSystem.
 		// however, after failed initialization (eg no zip file was appended to the binary),
 		// fs operations return an error.
-		fs := httpasset.Fs()
+		httpFS = httpasset.Fs()
 		if err := httpasset.Error(); err != nil {
-			log.Print(err)
-			log.Print("falling back to local assets")
+			log.Fatal(err)
 			// or alternatively fallback to to local file system:
-			fs = http.Dir("assets")
+			log.Print("falling back to local assets")
+			httpFS = http.Dir("assets")
 		}
+	}
 
-		http.Handle("/", http.FileServer(fs))
+	func main() {
+		http.Handle("/", http.FileServer(httpFS))
 		addr := ":8000"
 		log.Println("listening on", addr)
 		log.Fatal(http.ListenAndServe(addr, nil))
@@ -38,7 +42,7 @@ An example:
 Build your program, let's say the result is "mybinary".
 Now create a zip file, eg on unix:
 
-	(cd assets && zip -r0 ../assets.zip .)
+	(cd assets && zip -rq0 ../assets.zip .)
 
 Append it to the binary:
 
@@ -52,16 +56,17 @@ to /, and handle requests for / by returning the file /index.html
 if it exists.  If /index.html doesn't exist, it will list the
 contents of the directory. For net/http's Dir(), that works (the
 fallback `fs` in the example code). For httpasset's `fs`, reading
-directories isn't supported and returns an empty list of files
-(listing files is often not needed, simpler, and it's usually better
-not to leak such information).
+directories isn't supported and returns an empty list of files.
+Listing files is often not needed, simpler, and it's usually better
+not to leak such information.
 
 net/http's FileServer also supports requests for random i/o (range
-requests), and advertises this in response headers (unfortunately).
-Files in zip files can be compressed. Compressed files don't support
-random access. Httpasset returns an error when asked to serve range
-requests. In the future, support for random i/o could be added for
-files in the zip file that aren't compressed.
+requests), and advertises this in response headers.  Files in zip
+files can be compressed. Compressed files don't support random
+access. Httpasset returns an error when asked to serve range requests
+for compressed files. It's recommeded to add files to the zip file
+uncompressed. The -0 flag takes care of this in the example given
+earlier.
 
 To make this work, an assumption about zip files is made:
 That the central directory (with a list of files inside the zip file)
@@ -89,7 +94,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
+)
+
+var (
+	NotDirErr    = errors.New("not a directory")
+	LocateZipErr = errors.New("could not locate zip file, no end-of-central-directory signature found")
 )
 
 type opener interface {
@@ -97,123 +106,28 @@ type opener interface {
 }
 
 type fileOpener struct {
-	file *zip.File
-}
-
-type file struct {
-	offset int64 // offset in rc
-	atEOF  bool  // if true, we ignore offset and rc, and just return eof, in order to implement part of Seek
-	rc     io.ReadCloser
-	file   *zip.File
+	io.ReaderAt
+	zipFile *zip.File
 }
 
 func (f fileOpener) Open() (http.File, error) {
-	ff, err := f.file.Open()
+	if f.zipFile.Method == zip.Store {
+		offset, err := f.zipFile.DataOffset()
+		if err != nil {
+			return nil, err
+		}
+		return &uncompressedFile{io.NewSectionReader(f.ReaderAt, offset, int64(f.zipFile.UncompressedSize64)), f.zipFile}, nil
+	}
+	ff, err := f.zipFile.Open()
 	if err != nil {
 		return nil, err
 	}
-	return &file{0, false, ff, f.file}, nil
-}
-
-func (f *file) Seek(offset int64, whence int) (int64, error) {
-	// we implement part of Seek so we can use net/http.ServeContent, which seeks to the end to determine file size
-	switch whence {
-	case io.SeekStart:
-		if offset == 0 && f.offset == 0 {
-			f.atEOF = false
-			return 0, nil
-		}
-	case io.SeekEnd:
-		if offset == 0 {
-			f.atEOF = true
-			return int64(f.file.UncompressedSize64), nil
-		}
-	}
-	return -1, errors.New("seek only partially supported")
-}
-
-func (f *file) Close() error {
-	return f.rc.Close()
-}
-
-func (f *file) Read(buf []byte) (int, error) {
-	if f.atEOF {
-		return 0, nil
-	}
-	n, err := f.rc.Read(buf)
-	if n >= 0 {
-		f.offset += int64(n)
-	}
-	return n, err
-}
-
-func (f *file) Readdir(count int) ([]os.FileInfo, error) {
-	return nil, errors.New("not a directory")
-}
-
-func (f *file) Stat() (os.FileInfo, error) {
-	return f.file.FileInfo(), nil
-}
-
-type dir struct {
-}
-
-func (d dir) Open() (http.File, error) {
-	return d, nil
-}
-
-func (d dir) Close() error {
-	return nil
-}
-
-func (d dir) Read(p []byte) (n int, err error) {
-	return -1, errors.New("cannot read on directory")
-}
-
-func (d dir) Seek(offset int64, whence int) (int64, error) {
-	return -1, errors.New("cannot seek on directory")
-}
-
-func (d dir) Readdir(count int) ([]os.FileInfo, error) {
-	return []os.FileInfo{}, nil
-}
-
-type fileinfo struct {
-}
-
-func (fi fileinfo) Name() string {
-	return ""
-}
-
-func (fi fileinfo) Size() int64 {
-	return 0
-}
-
-func (fi fileinfo) Mode() os.FileMode {
-	return os.ModeDir | 0777
-}
-
-func (fi fileinfo) ModTime() time.Time {
-	return time.Time{}
-}
-
-func (fi fileinfo) IsDir() bool {
-	return true
-}
-
-func (fi fileinfo) Sys() interface{} {
-	return nil
-}
-
-var zerofileinfo fileinfo
-
-func (d dir) Stat() (os.FileInfo, error) {
-	return zerofileinfo, nil
+	return &compressedFile{ff, f.zipFile}, nil
 }
 
 type httpassetFS struct {
-	rc    *zip.ReadCloser
-	files map[string]opener
+	binary io.Closer
+	files  map[string]opener
 }
 
 var fs http.FileSystem
@@ -238,12 +152,13 @@ func Fs() http.FileSystem {
 // so that allows us to calculate the original size of the zip file.
 // which in turn allows us to use godoc's zipfs to serve the zip file withend.
 func open() (http.FileSystem, error) {
-	f, err := os.Open(os.Args[0])
+	bin, err := os.Open(os.Args[0])
 	if err != nil {
 		return nil, err
 	}
-	fi, err := f.Stat()
+	fi, err := bin.Stat()
 	if err != nil {
+		bin.Close()
 		return nil, err
 	}
 
@@ -253,41 +168,42 @@ func open() (http.FileSystem, error) {
 		n = size
 	}
 	buf := make([]byte, n)
-	_, err = io.ReadAtLeast(io.NewSectionReader(f, size-n, n), buf, len(buf))
+	_, err = io.ReadAtLeast(io.NewSectionReader(bin, size-n, n), buf, len(buf))
 	if err != nil {
+		bin.Close()
 		return nil, err
 	}
 	o := int64(findSignatureInBlock(buf))
 	if o < 0 {
-		return nil, errors.New("could not locate zip file, no end-of-central-directory signature found")
+		bin.Close()
+		return nil, LocateZipErr
 	}
 	cdirsize := int64(binary.LittleEndian.Uint32(buf[o+12:]))
 	cdiroff := int64(binary.LittleEndian.Uint32(buf[o+16:]))
 	zipsize := cdiroff + cdirsize + (int64(len(buf)) - o)
 
-	rr := io.NewSectionReader(f, size-zipsize, zipsize)
+	rr := io.NewSectionReader(bin, size-zipsize, zipsize)
 	r, err := zip.NewReader(rr, zipsize)
 	if err != nil {
+		bin.Close()
 		return nil, err
 	}
-
-	rc := &zip.ReadCloser{Reader: *r}
 
 	// build map of files. we create our own dirs, we don't want to be dependent on zip files containing proper hierarchies.
 	files := map[string]opener{}
 	files[""] = dir{}
-	for _, f := range rc.File {
+	for _, f := range r.File {
 		if strings.HasSuffix(f.Name, "/") {
 			continue
 		}
-		files[f.Name] = fileOpener{f}
+		files[f.Name] = fileOpener{rr, f}
 		elems := strings.Split(f.Name, "/")
 		for e := 1; e <= len(elems)-1; e++ {
 			name := strings.Join(elems[:e], "/")
 			files[name] = dir{}
 		}
 	}
-	return &httpassetFS{rc, files}, nil
+	return &httpassetFS{bin, files}, nil
 }
 
 // Error returns a non-nil error if no asset could be found in the binary.
@@ -304,7 +220,7 @@ func Error() error {
 func Close() {
 	switch fs := Fs().(type) {
 	case *httpassetFS:
-		fs.rc.Close()
+		fs.binary.Close()
 	}
 	fs = nil
 }

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -91,8 +92,10 @@ func doBuild(repo Repo, build Build, buildDir string) {
 
 func _doBuild(repo Repo, build Build, buildDir string) {
 	defer func() {
+		build.DiskUsage = buildDiskUsage(buildDir)
 		transact(func(tx *sql.Tx) {
-			_, err := tx.Exec("update build set finish=NOW() where id=$1 and finish is null", build.ID)
+			q := `update build set finish=NOW(), disk_usage=$1 where id=$2 and finish is null`
+			_, err := tx.Exec(q, build.DiskUsage, build.ID)
 			sherpaCheck(err, "marking build as finished in database")
 			events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
 		})
@@ -274,6 +277,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 	err = track(build.ID, "build", buildDir, result.stdout, result.stderr, wait)
 	sherpaUserCheck(err, "running command")
 
+	build.DiskUsage = buildDiskUsage(buildDir)
 	transact(func(tx *sql.Tx) {
 		outputDir := buildDir + "/output"
 		results := parseResults(checkoutDir, outputDir+"/build.stdout")
@@ -285,7 +289,7 @@ func _doBuild(repo Repo, build Build, buildDir string) {
 			sherpaCheck(err, "inserting result into database")
 		}
 
-		_, err = tx.Exec("update build set status='success', finish=NOW() where id=$1", build.ID)
+		_, err = tx.Exec("update build set status='success', finish=NOW(), disk_usage=$1 where id=$2", build.DiskUsage, build.ID)
 		sherpaCheck(err, "marking build as success in database")
 
 		events <- EventBuild{repo.Name, _build(tx, repo.Name, build.ID)}
@@ -560,5 +564,17 @@ func track(buildID int, step, buildDir string, cmdstdout, cmdstderr io.ReadClose
 
 	// second, we wait for the command result
 	xcheck(<-wait, "command failed")
+	return
+}
+
+// disk usage, best effort
+func buildDiskUsage(buildDir string) (diskUsage int64) {
+	filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil {
+			const overhead = 2 * 1024
+			diskUsage += overhead + info.Size()
+		}
+		return nil
+	})
 	return
 }

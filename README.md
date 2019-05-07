@@ -128,12 +128,9 @@ For feedback, bug reports and questions, please contact m.lukkien@irias.nl.
 
 # Developing
 
-You obviously need a Go compiler.
-But you'll also need:
-- to install the sherpadoc tool: (cd vendor/bitbucket.org/mjl/sherpa/cmd/sherpadoc && go install)
-- python (v2) to build the frontend files
-- jshint through npm and nodejs to check the JavaScript code: mkdir -p node_modules/.bin && npm install jshint@2.9.5
-- sass through gem and ruby to create CSS files
+You obviously need a Go compiler.  But you'll also need to run "make
+setup" to install jshint and node-sass through npm (nodejs), to
+check the JavaScript code and compile SASS.
 
 Now run: "make build test release"
 
@@ -143,6 +140,7 @@ Now run: "make build test release"
 - write test code
 - add authentication to application. need to figure out how to keep a dashboard. and how to do auth on /events
 - when on a build page, show it if a new build is already in progress, with a link to that new build
+- show last two lines of output. now the "make failed"-line is making that output not so useful.
 
 ## Maybe
 - allow configuring a cleanup script, that is run when a builddir is removed. eg for dropping a database that was created in build.sh.

@@ -77,14 +77,10 @@ func servehttp(args []string) {
 		log.Fatalf("bad database schema version, expected %d, saw %d", databaseVersion, dbVersion)
 	}
 
-	// mostly here to ensure go http lib doesn't do content sniffing. if it does, file serving breaks because seeking http assets is only partially implemeneted.
-	mime.AddExtensionType(".woff", "font/woff")
+	// so http package returns these known mimetypes
 	mime.AddExtensionType(".woff2", "font/woff2")
-	mime.AddExtensionType(".eot", "application/vnd.ms-fontobject")
-	mime.AddExtensionType(".svg", "image/svg+xml")
 	mime.AddExtensionType(".ttf", "font/ttf")
 	mime.AddExtensionType(".otf", "font/otf")
-	mime.AddExtensionType(".map", "application/json") // browser trying to look for css/js .map files
 
 	var doc sherpa.Doc
 	ff, err := httpFS.Open("/ding.json")
@@ -147,15 +143,32 @@ func servehttp(args []string) {
 	}()
 
 	unfinishedMsg := "marked as failed/unfinished at ding startup."
-	result, err := database.Exec(`update build set finish=now(), error_message=$1 where finish is null and status!='new'`, unfinishedMsg)
-	check(err, "marking unfinished builds as failed")
-	rows, err := result.RowsAffected()
-	check(err, "reading affected rows for marking unfinished builds as failed")
-	if rows > 0 {
-		log.Printf("marked %d unfinished builds as failed\n", rows)
+	qStale := `
+		with repo_builds as (
+			select
+				r.name as repoName,
+				b.id as buildID
+			from build b
+			join repo r on b.repo_id = r.id
+			where b.finish is null and b.status!='new'
+		)
+		select coalesce(json_agg(rb.*), '[]')
+		from repo_builds rb
+	`
+	var stales []struct {
+		RepoName string
+		BuildID  int
+	}
+	checkRow(database.QueryRow(qStale), &stales, "looking for stale builds in database")
+	for _, stale := range stales {
+		buildDir := fmt.Sprintf("data/build/%s/%d/", stale.RepoName, stale.BuildID)
+		du := buildDiskUsage(buildDir)
+
+		qMarkStale := `update build set finish=now(), error_message=$1, disk_usage=$2 where finish is null and status!='new' returning id`
+		checkRow(database.QueryRow(qMarkStale, unfinishedMsg, du), &stale.BuildID, "marking stale build in database")
+		log.Printf("marked %s stale build as failed\n", buildDir)
 	}
 
-	var buf []byte
 	var newBuilds []struct {
 		Repo  Repo
 		Build Build
@@ -165,8 +178,7 @@ func servehttp(args []string) {
 			select row_to_json(repo.*) as repo, row_to_json(build.*) as build from repo join build on repo.id = build.repo_id where status='new'
 		) x
 	`
-	check(database.QueryRow(qnew).Scan(&buf), "fetching new builds from database")
-	check(json.Unmarshal(buf, &newBuilds), "parsing new builds from database")
+	checkRow(database.QueryRow(qnew), &newBuilds, "fetching new builds from database")
 	for _, repoBuild := range newBuilds {
 		func(repo Repo, build Build) {
 			job := job{
@@ -260,7 +272,7 @@ func serveAsset(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/") {
 		r.URL.Path += "index.html"
 	}
-	f, err := httpFS.Open(r.URL.Path)
+	f, err := httpFS.Open("/web" + r.URL.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.NotFound(w, r)
